@@ -1,0 +1,178 @@
+# =========================
+# OS 文件
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# =========================
+# IDE / 编辑器
+# =========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.iml
+
+# =========================
+# Go
+# =========================
+# 二进制文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# 依赖目录（通常不提交）
+# vendor/
+
+# 构建输出
+bin/
+dist/
+
+# =========================
+# Python
+# =========================
+# 字节码
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+venv/
+.venv/
+ENV/
+env/
+.env/
+.env
+
+
+# 分发/打包
+build/
+develop-eggs/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+sdist/
+wheels/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.bat
+
+# Jupyter
+.ipynb_checkpoints/
+chat-from-*
+chat-entity
+thread-manager
+chat-bin
+chat-interactive
+chat
+*.sh
+指导规范.md
+samples/**/.env.example
+LANGUAGE_ROADMAP.md
+
+# MyPy
+.mypy_cache/
+
+# =========================
+# TypeScript / JavaScript
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# 构建输出
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# 缓存
+.cache/
+.parcel-cache/
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# 测试
+coverage/
+
+# =========================
+# Java
+# =========================
+# 编译输出
+*.class
+target/
+output/*
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# Gradle
+.gradle/
+.vscode
+.kiro
+.idea
+!gradle/wrapper/gradle-wrapper.jar
+
+# 日志
+*.log
+
+# =========================
+# 通用
+# =========================
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+*.env
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 日志文件
+logs/
+
+
+# 敏感文件
+*.pem
+*.key
+credentials.jsond

@@ -1,0 +1,28 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "apsara-ops",
+    "threadId": "",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "查询最近1小时CPU使用率超过80%的ECS实例"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "workspace": "default-workspace",
+        "region": "cn-hangzhou",
+        "project": "cms-metrics-project",
+        "metricstore": "acs_ecs_dashboard",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1770280244",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"fromTime\":1770276644,\"toTime\":1770280244}},{\"type\":\"metric_query\",\"data\":{\"namespace\":\"acs_ecs_dashboard\",\"metricName\":\"CPUUtilization\",\"dimensions\":{\"instanceId\":\"*\"},\"period\":60}}]",
+        "replaceUserValue": "@查询最近1小时CPU使用率超过80%的ECS实例"
+    }
+}

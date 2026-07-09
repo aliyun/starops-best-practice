@@ -1,0 +1,27 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "apsara-ops",
+    "threadId": "",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "cart 实体延迟多少"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "workspace": "default-cms-1819385687343877-cn-hongkong",
+        "region": "cn-hongkong",
+        "project": "default-cms-1819385687343877-cn-hongkong",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1770280244",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"fromTime\":1770274812,\"toTime\":1770275712}},{\"type\":\"entity\",\"data\":{\"entity_id\":\"469f8e313055adba13ca3f4e76c65505\",\"entity_domain\":\"apm\",\"entity_type\":\"apm.service\",\"title\":\"cart\",\"entityId\":\"469f8e313055adba13ca3f4e76c65505\",\"entityDomain\":\"apm\",\"entityType\":\"apm.service\",\"fromTime\":1770274812,\"toTime\":1770275712}}]",
+        "replaceUserValue": "@cart 实体延迟多少"
+    }
+}

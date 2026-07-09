@@ -1,0 +1,31 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "apsara-ops",
+    "threadId": "",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "帮我查看里面有多少种类的 admin_emails"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "workspace": "default-cms-1819385687343877-cn-hongkong",
+        "region": "cn-hangzhou",
+        "project": "qs-demos-devops-demo",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1770258091",
+        "logstore": "aone_datasets",
+        "startTime": 1770257151,
+        "endTime": 1770258051,
+        "skill_name": "sql_generation",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"from_time\":1770257151,\"to_time\":1770258051,\"fromTime\":1770257151,\"toTime\":1770258051}}]",
+        "skill": "sql_generation"
+    }
+}

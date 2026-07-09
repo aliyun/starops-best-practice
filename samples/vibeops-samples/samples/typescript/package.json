@@ -1,0 +1,40 @@
+{
+  "name": "starops-sdk-samples",
+  "version": "1.0.0",
+  "description": "Alibaba Cloud STAROps SDK samples for TypeScript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "chat": "tsx src/examples/chat.ts",
+    "chat-from-file": "tsx src/examples/chat-from-file.ts",
+    "thread-manager": "tsx src/examples/thread-manager.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "alibaba-cloud",
+    "starops",
+    "sdk",
+    "samples"
+  ],
+  "author": "Alibaba Cloud",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@alicloud/credentials": "^2.4.5",
+    "@alicloud/openapi-client": "^0.4.0",
+    "@alicloud/starops20260428": "1.0.0",
+    "dotenv": "^16.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

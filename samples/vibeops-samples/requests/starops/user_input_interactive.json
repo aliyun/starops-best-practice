@@ -1,0 +1,28 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "starops_skills_test",
+    "threadId": "thread-th4hdr-4iwl13xkp9vh",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "演示 user_input 事件"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "project": "default-cms-1819385687343877-cn-hongkong",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"from_time\":1782272054,\"to_time\":1782272954,\"fromTime\":1782272054,\"toTime\":1782272954}}]",
+        "workspace": "default-cms-1819385687343877-cn-hongkong",
+        "region": "cn-hongkong",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1782281727",
+        "source": "{\"current_uid\":\"209997065346592973\",\"uid\":\"1819385687343877\",\"isSts\":false,\"isSub\":true,\"internalUser\":true,\"url\":\"https://starops.console.aliyun.com/chat?staropsClusterRegion=cn-beijing&threadId=thread-th4hdr-4iwl13xkp9vh&assistantId=starops_skills_test\",\"origin\":\"https://starops.console.aliyun.com\",\"isProd\":true}",
+        "config": "{\"disableThreadData\":false}"
+    }
+}

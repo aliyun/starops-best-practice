@@ -1,0 +1,32 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "apsara-ops",
+    "threadId": "",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "帮我查询最近15分钟内状态码为5xx的错误日志，按时间趋势展示，并统计每个接口的错误次数Top10"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "workspace": "",
+        "region": "rus-west-1",
+        "project": "cms-haoqi-test-rus-33bmprkrefaaadtt",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1772266435",
+        "logstore": "haoqi-test-rus__entity",
+        "startTime": 1772265524,
+        "endTime": 1772266424,
+        "skill_name": "sql_generation",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"from_time\":1772265524,\"to_time\":1772266424,\"fromTime\":1772265524,\"toTime\":1772266424}}]",
+        "skill": "sql_generation",
+        "source": "{\"current_uid\":\"[uid]\",\"uid\":\"[uid]\",\"isSts\":false,\"isSub\":true,\"internalUser\":true,\"url\":\"https://sls.console.aliyun.com/lognext/project/cms-haoqi-test-rus-33bmprkrefaaadtt/logsearch/haoqi-test-rus__entity?slsRegion=rus-west-1\",\"origin\":\"https://sls.console.aliyun.com\",\"isProd\":true}"
+    }
+}

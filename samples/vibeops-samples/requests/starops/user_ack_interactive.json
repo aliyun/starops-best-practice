@@ -1,0 +1,28 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "starops_skills_test",
+    "threadId": "thread-th2r59-1iwcdex3x965i",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "aliyun ecs DescribeInstances --RegionId cn-hangzhou"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "project": "",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"from_time\":1782200069,\"to_time\":1782200969,\"fromTime\":1782200069,\"toTime\":1782200969}}]",
+        "workspace": "",
+        "region": "cn-hongkong",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1782201068",
+        "source": "{\"current_uid\":\"209997065346592973\",\"uid\":\"1819385687343877\",\"isSts\":false,\"isSub\":true,\"internalUser\":true,\"url\":\"https://starops.console.aliyun.com/chat?staropsClusterRegion=cn-beijing&threadId=thread-th2r59-1iwcdex3x965i&assistantId=starops_skills_test\",\"origin\":\"https://starops.console.aliyun.com\",\"isProd\":true}",
+        "config": "{\"disableThreadData\":false}"
+    }
+}

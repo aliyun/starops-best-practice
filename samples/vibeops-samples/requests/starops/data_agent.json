@@ -1,0 +1,28 @@
+{
+    "region": "cn-beijing",
+    "digitalEmployeeName": "apsara-ops",
+    "threadId": "",
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "查询最近1小时的告警数量"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "workspace": "default-cms-1819385687343877-cn-hongkong",
+        "region": "cn-hongkong",
+        "project": "default-cms-1819385687343877-cn-hongkong",
+        "language": "zh",
+        "timeZone": "Asia/Shanghai",
+        "timeStamp": "1770710677",
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"fromTime\":1770685976,\"toTime\":1770686876}}]",
+        "startTime": 1770685976,
+        "endTime": 1770686876
+    }
+}
