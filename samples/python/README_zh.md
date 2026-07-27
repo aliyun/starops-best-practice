@@ -50,6 +50,10 @@ python -m starops_sdk_samples.examples.chat_from_file -file ../sample-requests/e
 使用 `-simple` 可切换为仅输出文本。
 
 
+## 停止对话
+
+对话运行时按 `Ctrl+C`（或发送 `SIGTERM`），客户端会发送 `stop` 请求（`action="stop"`）中断当前响应后退出。请求带短超时，确保进程不会卡住。
+
 ## SSE 重试与重连
 
 客户端通过 SSE 流式接收响应，并在连接中断时透明恢复。
@@ -85,8 +89,8 @@ python -m starops_sdk_samples.examples.chat_from_file -file ../sample-requests/e
 | 变量 | 必需 | 默认值 | 说明 |
 |------|------|--------|------|
 | `STAROPS_ENDPOINT` | ✅ | — | STAROps API 端点，如 `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | ✅ | — | 工作空间 ID |
-| `STAROPS_REGION` | ❌ | `cn-hangzhou` | 地域（需与端点匹配） |
+| `STAROPS_WORKSPACE` | ❌ | — | 工作空间 ID，可选，不填写时程序也可运行 |
+| `STAROPS_REGION` | ❌ | `cn-beijing` | 数据查询所在的阿里云地域，与服务接入点（endpoint）无关 |
 | `STAROPS_EMPLOYEE_NAME` | ❌ | `apsara-ops` | 数字员工名称 |
 | `STAROPS_MAX_RETRIES` | ❌ | `10` | SSE 最大重连次数 |
 | `STAROPS_IDLE_TIMEOUT` | ❌ | `60` | 空闲超时秒数，超时未收到消息则重连 |
@@ -126,7 +130,7 @@ python/
 │   ├── client/        # 核心客户端：对话、会话、重试、打印器
 │   ├── types/         # 类型定义
 │   ├── logger/        # 日志工具
-│   └── examples/      # chat、chat_from_file、thread_manager
+│   └── examples/      # chat、chat_from_file
 ├── tests/             # 测试用例
 ├── pyproject.toml
 └── README.md

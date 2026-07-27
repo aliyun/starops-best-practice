@@ -1,4 +1,12 @@
+/**
+ * AgentClient.java — 主客户端入口 (Java 8 兼容版)
+ * 职责：初始化 SDK 客户端、加载配置(.env)、发起对话请求、分发 SSE 事件流。
+ * 不做：不处理重连(→RetrySupport)、不处理交互(→InteractiveHandler)、不做输出格式化(→EventPrinter)。
+ * 依赖：starops SDK、Credentials、RetrySupport、ThreadMessage
+ */
 package com.alibaba.cloud.starops.samples.client;
+
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,7 +55,10 @@ import darabonba.core.client.ClientOverrideConfiguration;
  * 注意：异步 SDK 实际运行需要 JDK 8u251+；本项目源码语法严格遵守 JDK 8 兼容（不使用 var、Map.of 等 JDK 9+ 特性）
  * Note: Async SDK runtime requires JDK 8u251+; source code strictly follows JDK 8 syntax for legacy compatibility
  */
-public class AgentClient implements AutoCloseable {
+public class AgentClient implements ChatClient, AutoCloseable {
+    private static final String DEFAULT_LANGUAGE = "zh";
+    private static final String DEFAULT_TIMEZONE = "Asia/Shanghai";
+
     private final AsyncClient client;
     private final Config config;
     private final ObjectMapper objectMapper;
@@ -96,6 +107,7 @@ public class AgentClient implements AutoCloseable {
      * Create a new thread with optional attributes
      */
     public String createThread(Map<String, String> attributes) throws SDKException {
+        if (config.isMockMode()) return "mock-thread-001";
         try {
             CreateThreadRequest.Builder builder = CreateThreadRequest.builder()
                     .name(config.getEmployeeName())
@@ -131,8 +143,8 @@ public class AgentClient implements AutoCloseable {
         Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("workspace", config.getWorkspace());
         variables.put("region", config.getRegion());
-        variables.put("language", "zh");
-        variables.put("timeZone", "Asia/Shanghai");
+        variables.put("language", DEFAULT_LANGUAGE);
+        variables.put("timeZone", DEFAULT_TIMEZONE);
         variables.put("timeStamp", String.valueOf(now));
         variables.put("startTime", String.valueOf(now - 15 * 60));
         variables.put("endTime", String.valueOf(now));
@@ -150,8 +162,8 @@ public class AgentClient implements AutoCloseable {
         long now = Instant.now().getEpochSecond();
         if (!finalVariables.containsKey("workspace")) finalVariables.put("workspace", config.getWorkspace());
         if (!finalVariables.containsKey("region")) finalVariables.put("region", config.getRegion());
-        if (!finalVariables.containsKey("language")) finalVariables.put("language", "zh");
-        if (!finalVariables.containsKey("timeZone")) finalVariables.put("timeZone", "Asia/Shanghai");
+        if (!finalVariables.containsKey("language")) finalVariables.put("language", DEFAULT_LANGUAGE);
+        if (!finalVariables.containsKey("timeZone")) finalVariables.put("timeZone", DEFAULT_TIMEZONE);
         if (!finalVariables.containsKey("timeStamp")) finalVariables.put("timeStamp", String.valueOf(now));
         if (!finalVariables.containsKey("startTime")) finalVariables.put("startTime", String.valueOf(now - 15 * 60));
         if (!finalVariables.containsKey("endTime")) finalVariables.put("endTime", String.valueOf(now));
@@ -172,13 +184,43 @@ public class AgentClient implements AutoCloseable {
                             .build();
 
                     CreateChatRequest request = CreateChatRequest.builder()
-                            .regionId(config.getRegion())
                             .action("create")
                             .threadId(threadId)
                             .digitalEmployeeName(config.getEmployeeName())
                             .messages(Collections.singletonList(msg))
                             .variables(finalVariables)
                             .build();
+
+                    // Mock/Record 模式
+                    if (config.isMockMode() || config.isRecordMode()) {
+                        if (config.isRecordMode()) {
+                            ResponseIterable<CreateChatResponseBody> iterable =
+                                    client.createChatWithResponseIterable(request);
+                            Iterator<CreateChatResponseBody> iterator = iterable.iterator();
+                            while (iterator.hasNext()) {
+                                CreateChatResponseBody body = iterator.next();
+                                if (body != null) {
+                                    Map<String, Object> map = bodyToMap(body);
+                                    String jsonStr = objectMapper.writeValueAsString(map);
+                                    MockSDK.recordEvent(config, createMockEventMap(map));
+                                    JsonNode jsonNode = objectMapper.readTree(jsonStr);
+                                    events.put(ChatEvent.fromResponse(jsonNode, jsonStr, 200));
+                                }
+                            }
+                            MockSDK.writeSeparator(config);
+                        } else {
+                            java.util.List<Map<String, Object>> mockEvents = MockSDK.mockStream(config);
+                            for (Map<String, Object> raw : mockEvents) {
+                                if (raw.get("body") != null) {
+                                    String jsonStr = objectMapper.writeValueAsString(raw.get("body"));
+                                    JsonNode jsonNode = objectMapper.readTree(jsonStr);
+                                    events.put(ChatEvent.fromResponse(jsonNode, jsonStr, 200));
+                                }
+                            }
+                        }
+                        events.put(ChatEvent.done());
+                        return;
+                    }
 
                     // 带重试能力的 SSE 流处理 / SSE streaming with retry
                     streamSSEWithRetry(request, events);
@@ -210,8 +252,8 @@ public class AgentClient implements AutoCloseable {
         variables.put("userInteractive", userInteractive);
         if (!variables.containsKey("workspace")) variables.put("workspace", config.getWorkspace());
         if (!variables.containsKey("region")) variables.put("region", config.getRegion());
-        if (!variables.containsKey("language")) variables.put("language", "zh");
-        if (!variables.containsKey("timeZone")) variables.put("timeZone", "Asia/Shanghai");
+        if (!variables.containsKey("language")) variables.put("language", DEFAULT_LANGUAGE);
+        if (!variables.containsKey("timeZone")) variables.put("timeZone", DEFAULT_TIMEZONE);
         if (!variables.containsKey("timeStamp")) variables.put("timeStamp", String.valueOf(now));
         if (!variables.containsKey("startTime")) variables.put("startTime", String.valueOf(now - 15 * 60));
         if (!variables.containsKey("endTime")) variables.put("endTime", String.valueOf(now));
@@ -221,12 +263,42 @@ public class AgentClient implements AutoCloseable {
             public void run() {
                 try {
                     CreateChatRequest request = CreateChatRequest.builder()
-                            .regionId(config.getRegion())
                             .action("interact")
                             .threadId(threadId)
                             .digitalEmployeeName(config.getEmployeeName())
                             .variables(variables)
                             .build();
+
+                    // Mock/Record 模式
+                    if (config.isMockMode() || config.isRecordMode()) {
+                        if (config.isRecordMode()) {
+                            ResponseIterable<CreateChatResponseBody> iterable =
+                                    client.createChatWithResponseIterable(request);
+                            Iterator<CreateChatResponseBody> iterator = iterable.iterator();
+                            while (iterator.hasNext()) {
+                                CreateChatResponseBody body = iterator.next();
+                                if (body != null) {
+                                    Map<String, Object> map = bodyToMap(body);
+                                    String jsonStr = objectMapper.writeValueAsString(map);
+                                    MockSDK.recordEvent(config, createMockEventMap(map));
+                                    JsonNode jsonNode = objectMapper.readTree(jsonStr);
+                                    events.put(ChatEvent.fromResponse(jsonNode, jsonStr, 200));
+                                }
+                            }
+                            MockSDK.writeSeparator(config);
+                        } else {
+                            java.util.List<Map<String, Object>> mockEvents = MockSDK.mockStream(config);
+                            for (Map<String, Object> raw : mockEvents) {
+                                if (raw.get("body") != null) {
+                                    String jsonStr = objectMapper.writeValueAsString(raw.get("body"));
+                                    JsonNode jsonNode = objectMapper.readTree(jsonStr);
+                                    events.put(ChatEvent.fromResponse(jsonNode, jsonStr, 200));
+                                }
+                            }
+                        }
+                        events.put(ChatEvent.done());
+                        return;
+                    }
 
                     // 带重试能力的 SSE 流处理 / SSE streaming with retry
                     streamSSEWithRetry(request, events);
@@ -493,7 +565,9 @@ public class AgentClient implements AutoCloseable {
                     Thread.currentThread().interrupt();
                     try {
                         timedEvents.put(ChatEvent.error(SDKException.cancelled()));
-                    } catch (InterruptedException ignored) {}
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             }
         });
@@ -786,6 +860,47 @@ public class AgentClient implements AutoCloseable {
         }
 
         return "";
+    }
+
+    private Map<String, Object> createMockEventMap(Map<String, Object> body) {
+        Map<String, Object> m = new HashMap<String, Object>();
+        m.put("id", "");
+        m.put("event", "message");
+        m.put("body", body);
+        return m;
+    }
+
+    /**
+     * 发送停止请求，中断正在进行的对话（带超时，避免阻塞退出流程）
+     * Send stop request to interrupt the ongoing chat
+     */
+    public void stop(String threadId) {
+        stop(threadId, null);
+    }
+
+    public void stop(String threadId, Map<String, Object> variables) {
+        if (config.isMockMode()) return;
+        if (variables == null) variables = new HashMap<>();
+        long now = Instant.now().getEpochSecond();
+        variables.putIfAbsent("workspace", config.getWorkspace());
+        variables.putIfAbsent("region", config.getRegion());
+        variables.putIfAbsent("language", DEFAULT_LANGUAGE);
+        variables.putIfAbsent("timeZone", DEFAULT_TIMEZONE);
+        variables.putIfAbsent("timeStamp", String.valueOf(now));
+        variables.putIfAbsent("startTime", String.valueOf(now - 15 * 60));
+        variables.putIfAbsent("endTime", String.valueOf(now));
+
+        try {
+            CreateChatRequest request = CreateChatRequest.builder()
+                    .action("stop")
+                    .threadId(threadId)
+                    .digitalEmployeeName(config.getEmployeeName())
+                    .variables(variables)
+                    .build();
+            client.createChat(request).get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            System.err.println("stop 请求失败: " + e.getMessage());
+        }
     }
 
     public void shutdown() {

@@ -1,5 +1,12 @@
+/**
+ * EventPrinter.java — 详细模式事件格式化输出
+ * 职责：将 ChatEvent 格式化为人类可读的终端输出（含工具调用、思考过程、交互事件等）。
+ * 不做：不修改事件内容、不处理重连、不做简洁模式输出(→SimplePrinter)。
+ * 依赖：ChatEvent、Jackson
+ */
 package com.alibaba.cloud.starops.samples.client;
 
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

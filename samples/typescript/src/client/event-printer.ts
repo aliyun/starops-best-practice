@@ -1,9 +1,11 @@
 /**
- * 事件打印器 - 打印每个 SSE 事件的详细信息
- * Event printer - prints detailed information for each SSE event
+ * event-printer.ts — 详细模式事件格式化输出
+ * 职责：将 ChatEvent 格式化为人类可读的终端输出（含工具调用、思考过程、交互事件等）。
+ * 不做：不修改事件内容、不处理重连、不做简洁模式输出(→simple-printer.ts)。
+ * 依赖：ChatEvent、types/index.ts
  */
 
-import { ChatEvent } from './agent-client.js';
+import { ChatEvent } from '../types/events.js';
 
 /** 事件打印器 / Event printer */
 export class EventPrinter {

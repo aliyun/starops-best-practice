@@ -1,3 +1,9 @@
+/**
+ * RetrySupport.java — SSE 流重连与指数退避
+ * 职责：管理 SSE 连接生命周期，断线后自动重连、指数退避、消息去重、空闲超时检测。
+ * 不做：不解析事件内容(→ChatEvent)、不做输出(→EventPrinter)、不处理交互。
+ * 依赖：starops SDK (CreateChat API)、ErrorCode
+ */
 package com.alibaba.cloud.starops.samples.client;
 
 import java.util.HashMap;
@@ -5,6 +11,9 @@ import java.util.Map;
 
 import com.aliyun.sdk.service.starops20260428.models.CreateChatRequest;
 import com.fasterxml.jackson.databind.JsonNode;
+
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
+import com.alibaba.cloud.starops.samples.types.EventType;
 
 /**
  * SSE 重试支持：状态、结果枚举与纯函数工具集
@@ -136,7 +145,7 @@ public final class RetrySupport {
             }
             for (JsonNode evt : events) {
                 JsonNode type = evt.get("type");
-                if (type != null && "stream_done".equals(type.asText())) {
+                if (type != null && EventType.STREAM_DONE.getValue().equals(type.asText())) {
                     return true;
                 }
             }
@@ -161,10 +170,6 @@ public final class RetrySupport {
                 .threadId(origReq.getThreadId())
                 .digitalEmployeeName(origReq.getDigitalEmployeeName())
                 .variables(variables);
-
-        if (origReq.getRegionId() != null) {
-            builder.regionId(origReq.getRegionId());
-        }
 
         // 重连不需要 Messages
         return builder.build();

@@ -3,7 +3,7 @@
  * STAROps SDK 简洁打印器
  */
 
-import { ChatEvent } from './agent-client.js';
+import { ChatEvent } from '../types/events.js';
 
 /** 简洁模式打印器 / Simple mode printer */
 export class SimplePrinter {

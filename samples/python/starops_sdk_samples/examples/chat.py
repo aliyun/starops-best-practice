@@ -8,6 +8,8 @@ Usage: python -m starops_sdk_samples.examples.chat
 
 import asyncio
 import json
+import os
+import signal
 import sys
 from typing import Optional
 
@@ -36,6 +38,19 @@ async def main_async():
         print("📝 创建会话...")
         thread_id = client.create_thread()
         print(f"✅ ThreadID: {thread_id}\n")
+
+        # 捕获中断信号，发送 stop 请求
+        def _stop_handler():
+            print("\n⏹️  正在停止对话...")
+            try:
+                client.stop(thread_id)
+            except Exception as e:
+                sys.stderr.write(f"stop 请求失败: {e}\n")
+            os._exit(0)
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, _stop_handler)
 
         # Create printer
         printer = SimplePrinter()

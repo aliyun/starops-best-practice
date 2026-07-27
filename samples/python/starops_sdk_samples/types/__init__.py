@@ -4,11 +4,19 @@ STAROps SDK 类型定义
 """
 
 from .enums import EventType, MessageRole, ContentType, ItemStatus, InteractionType
-from .events import ItemContent, ItemEvent, ItemTool, MessageItem
+from .events import (
+    ItemContent,
+    ItemEvent,
+    ItemTool,
+    MessageItem,
+    ChatEvent,
+    ThreadInfo,
+    ThreadMessage,
+)
 
 __all__ = [
     "EventType",
-    "MessageRole", 
+    "MessageRole",
     "ContentType",
     "ItemStatus",
     "InteractionType",
@@ -16,4 +24,7 @@ __all__ = [
     "ItemEvent",
     "ItemTool",
     "MessageItem",
+    "ChatEvent",
+    "ThreadInfo",
+    "ThreadMessage",
 ]

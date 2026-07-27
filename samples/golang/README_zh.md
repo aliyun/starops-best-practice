@@ -67,7 +67,7 @@ create ──► 流式接收事件 ──► stream_done ✅（正常结束）
 > [!NOTE]
 > 超过最大重试次数后，客户端会返回错误事件，而不会一直挂起。
 
-重试逻辑位于 [`internal/client/retry.go`](internal/client/retry.go)。
+重试逻辑位于 [`pkg/client/retry.go`](pkg/client/retry.go)。
 
 ### 测试重试逻辑
 
@@ -101,8 +101,8 @@ export ALIBABA_CLOUD_ACCESS_KEY_SECRET=<your-access-key-secret>
 | 变量 | 必需 | 默认值 | 说明 |
 |------|------|--------|------|
 | `STAROPS_ENDPOINT` | ✅ | — | STAROps API 端点，如 `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | ✅ | — | 工作空间 ID |
-| `STAROPS_REGION` | ❌ | `cn-hangzhou` | 地域（需与端点匹配） |
+| `STAROPS_WORKSPACE` | ❌ | — | 工作空间 ID，可选，不填写时程序也可运行 |
+| `STAROPS_REGION` | ❌ | `cn-beijing` | 数据查询所在的阿里云地域，与服务接入点（endpoint）无关 |
 | `STAROPS_EMPLOYEE_NAME` | ❌ | `apsara-ops` | 数字员工名称 |
 | `STAROPS_MAX_RETRIES` | ❌ | `10` | SSE 最大重连次数 |
 | `STAROPS_IDLE_TIMEOUT` | ❌ | `60` | 空闲超时秒数，超时未收到消息则重连 |
@@ -125,7 +125,7 @@ golang/
 ├── cmd/
 │   ├── chat/              # 交互式对话
 │   └── chat-from-file/    # 从 JSON 运行请求（文件或目录）
-├── internal/
+├── pkg/
 │   ├── client/            # 核心客户端：对话、会话、重试、打印器、错误
 │   │   ├── client.go      # AgentClient、配置、对话方法
 │   │   ├── retry.go       # SSE 重连、退避、去重

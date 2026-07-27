@@ -52,21 +52,11 @@ mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ChatF
     -Dexec.args="-dir ../sample-requests/"
 ```
 
-### ThreadManager — manage threads
+### Stop on interrupt
 
-```bash
-# List threads
-mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ThreadManager" \
-    -Dexec.args="list"
-
-# Thread details
-mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ThreadManager" \
-    -Dexec.args="get <thread-id>"
-
-# Delete a thread
-mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ThreadManager" \
-    -Dexec.args="delete <thread-id>"
-```
+While a chat is running, press `Ctrl+C` (or send `SIGTERM`). The client sends a
+`stop` request (`action="stop"`) to interrupt the ongoing response, then exits.
+The request is best-effort with a short timeout so the process never hangs.
 
 ## SSE Retry & Reconnection
 
@@ -103,8 +93,8 @@ deduplicates by timestamp, and finishes at `stream_done`.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `STAROPS_ENDPOINT` | ✅ | — | STAROps API endpoint, e.g. `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | ✅ | — | Workspace ID |
-| `STAROPS_REGION` | ❌ | `cn-hangzhou` | Region (should match the endpoint) |
+| `STAROPS_WORKSPACE` | ❌ | — | Workspace ID. Optional. The sample runs without it. |
+| `STAROPS_REGION` | ❌ | `cn-beijing` | Alibaba Cloud region where data queries are performed; independent of the service endpoint |
 | `STAROPS_EMPLOYEE_NAME` | ❌ | `apsara-ops` | Digital employee name |
 | `STAROPS_MAX_RETRIES` | ❌ | `10` | Max SSE reconnect attempts |
 | `STAROPS_IDLE_TIMEOUT` | ❌ | `60` | Idle timeout (seconds); reconnect if no message arrives within this window |
@@ -127,6 +117,10 @@ export ALIBABA_CLOUD_ACCESS_KEY_SECRET=<your-access-key-secret>
 | `-simulate-error` | `Chat`, `ChatFromFile` | Simulate a network disconnection to exercise retries |
 | `-file <path>` | `ChatFromFile` | Load a single request from a JSON file |
 | `-dir <path>` | `ChatFromFile` | Batch-process every JSON request in a directory |
+| `-mock` | `ChatFromFile` | Replay a recorded SSE session (offline, no credentials) |
+| `-mock-file <path>` | `ChatFromFile` | SSE recording file for mock/record mode |
+| `-simple` | `ChatFromFile` | Print only the final text result |
+| `-record` | `ChatFromFile` | Record real SSE events to a JSONL file |
 
 > [!TIP]
 > Pass flags through Maven with `-Dexec.args="..."`, e.g. `-Dexec.args="-file ../sample-requests/entity.json"`.
@@ -140,7 +134,7 @@ java/
 │   │   ├── client/    # Core client: chat, threads, retry, printers
 │   │   ├── types/     # Type definitions
 │   │   ├── logger/    # Logging utilities
-│   │   └── examples/  # Chat, ChatFromFile, ThreadManager
+│   │   └── examples/  # Chat, ChatFromFile
 │   └── test/          # Test suite
 ├── pom.xml
 └── README.md

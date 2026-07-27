@@ -18,6 +18,10 @@ public class Config {
     private String employeeName;
     private RetryConfig retryConfig = RetryConfig.getDefault();
     private boolean simulateNetworkError = false;
+    private boolean mockMode = false;
+    private boolean recordMode = false;
+    public String mockFile;
+    public String mockInput;
 
     public Config() {}
 
@@ -71,7 +75,7 @@ public class Config {
             cfg.employeeName = "apsara-ops";
         }
         if (cfg.region == null || cfg.region.isEmpty()) {
-            cfg.region = "cn-hangzhou";
+            cfg.region = "cn-beijing";
         }
 
         // 加载重试配置（支持环境变量优先，.env fallback）
@@ -152,4 +156,13 @@ public class Config {
     public void setSimulateNetworkError(boolean simulateNetworkError) {
         this.simulateNetworkError = simulateNetworkError;
     }
+
+    public boolean isMockMode() { return mockMode; }
+    public void setMockMode(boolean mockMode) { this.mockMode = mockMode; }
+    public boolean isRecordMode() { return recordMode; }
+    public void setRecordMode(boolean recordMode) { this.recordMode = recordMode; }
+    public String getMockFile() { return mockFile; }
+    public void setMockFile(String mockFile) { this.mockFile = mockFile; }
+    public String getMockInput() { return mockInput; }
+    public void setMockInput(String mockInput) { this.mockInput = mockInput; }
 }

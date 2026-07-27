@@ -47,6 +47,20 @@ go run ./cmd/chat-from-file/ -file ../sample-requests/entity.json
 go run ./cmd/chat-from-file/ -dir ../sample-requests/
 ```
 
+## Stop on interrupt
+
+While a chat is running, press `Ctrl+C` (or send `SIGTERM`). The client sends a `stop`
+request (`action="stop"`) to interrupt the ongoing response, then exits. The request is
+best-effort with a short timeout so the process never hangs.
+
+## Mock playback
+
+Replay a recorded SSE session offline — no credentials or network required:
+
+```bash
+make go-mock
+# or: go run ./cmd/chat-from-file --file ../sample-requests/data_agent.json --mock --mock-file <mock-file> --simple
+```
 
 ## SSE Retry & Reconnection
 
@@ -68,7 +82,7 @@ create ──► stream events ──► stream_done ✅ (normal completion)
 > [!NOTE]
 > After exceeding the maximum retries, the client returns an error event instead of hanging.
 
-The retry logic lives in [`internal/client/retry.go`](internal/client/retry.go).
+The retry logic lives in [`pkg/client/retry.go`](pkg/client/retry.go).
 
 ### Testing the retry logic
 
@@ -102,8 +116,8 @@ export ALIBABA_CLOUD_ACCESS_KEY_SECRET=<your-access-key-secret>
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `STAROPS_ENDPOINT` | ✅ | — | STAROps API endpoint, e.g. `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | ✅ | — | Workspace ID |
-| `STAROPS_REGION` | ❌ | `cn-hangzhou` | Region (should match the endpoint) |
+| `STAROPS_WORKSPACE` | ❌ | — | Workspace ID. Optional. The sample runs without it. |
+| `STAROPS_REGION` | ❌ | `cn-beijing` | Alibaba Cloud region where data queries are performed; independent of the service endpoint |
 | `STAROPS_EMPLOYEE_NAME` | ❌ | `apsara-ops` | Digital employee name |
 | `STAROPS_MAX_RETRIES` | ❌ | `10` | Max SSE reconnect attempts |
 | `STAROPS_IDLE_TIMEOUT` | ❌ | `60` | Idle timeout (seconds); reconnect if no message arrives within this window |
@@ -126,7 +140,7 @@ golang/
 ├── cmd/
 │   ├── chat/              # Interactive chat
 │   └── chat-from-file/    # Run requests from JSON (file or directory)
-├── internal/
+├── pkg/
 │   ├── client/            # Core client: chat, threads, retry, printers, errors
 │   │   ├── client.go      # AgentClient, config, chat methods
 │   │   ├── retry.go       # SSE reconnection, backoff, dedupe

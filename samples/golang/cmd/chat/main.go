@@ -1,44 +1,74 @@
 // 交互式对话示例
 // Interactive Chat Example
 //
-// 用法 / Usage: go run ./cmd/chat/
+// 用法 / Usage: go run ./cmd/chat/ [--simulate-error]
 package main
 
 import (
 	"bufio"
 	"context"
-	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
-	"github.com/starops/pkg/client"
-	"github.com/starops/pkg/types"
+	"github.com/aliyun/starops-best-practice/samples/golang/pkg/client"
+	"github.com/aliyun/starops-best-practice/samples/golang/pkg/config"
+	"github.com/aliyun/starops-best-practice/samples/golang/pkg/interactive"
+	"github.com/aliyun/starops-best-practice/samples/golang/pkg/printer"
+	"github.com/aliyun/starops-best-practice/samples/golang/pkg/types"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	var simulateError bool
-	flag.BoolVar(&simulateError, "simulate-error", false, "模拟网络断连，测试重试逻辑")
-	flag.Parse()
+// chatOptions 保存 chat 命令的参数
+type chatOptions struct {
+	simulateError bool
+}
 
+func main() {
+	opts := &chatOptions{}
+
+	rootCmd := &cobra.Command{
+		Use:   "chat",
+		Short: "STAROps 交互式对话示例",
+		Long: `STAROps 交互式对话示例
+
+从终端读取用户输入并与 STAROps Agent 进行流式对话，
+支持交互事件恢复与网络断连重试。`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runChat(opts)
+		},
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
+	rootCmd.Flags().BoolVar(&opts.simulateError, "simulate-error", false, "模拟网络断连，测试重试逻辑")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runChat(opts *chatOptions) error {
 	fmt.Println("🚀 STAROps Chat")
 	fmt.Println(strings.Repeat("=", 60))
 
 	// 加载配置
-	cfg, err := client.LoadConfigFromEnv()
+	cfg, err := config.LoadConfigFromEnv()
 	if err != nil {
-		fmt.Printf("❌ 配置加载失败: %v\n", err)
 		fmt.Println("\n请设置环境变量:")
 		fmt.Println("  STAROPS_ENDPOINT")
 		fmt.Println("  ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET")
-		os.Exit(1)
+		return fmt.Errorf("配置加载失败: %w", err)
 	}
 
 	fmt.Printf("📋 Employee: %s\n\n", cfg.EmployeeName)
 
-	if simulateError {
+	if opts.simulateError {
 		cfg.SimulateNetworkError = true
 		fmt.Println("⚠️  已启用网络断连模拟，将在收到首个事件后触发重试")
 	}
@@ -46,8 +76,7 @@ func main() {
 	// 创建客户端
 	agentClient, err := client.NewAgentClient(cfg)
 	if err != nil {
-		fmt.Printf("❌ 创建客户端失败: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("创建客户端失败: %w", err)
 	}
 
 	ctx := context.Background()
@@ -56,14 +85,35 @@ func main() {
 	fmt.Println("📝 创建会话...")
 	threadID, err := agentClient.CreateThread(ctx)
 	if err != nil {
-		fmt.Printf("❌ 创建会话失败: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("创建会话失败: %w", err)
 	}
 	fmt.Printf("✅ ThreadID: %s\n\n", threadID)
 
+	// 捕获中断信号，发送 stop 请求
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		fmt.Println("\n⏹️  正在停止对话...")
+		// 带超时的 goroutine，确保即使 Stop 卡住也能退出
+		done := make(chan struct{})
+		go func() {
+			if err := agentClient.Stop(context.Background(), threadID, nil); err != nil {
+				fmt.Printf("⚠️  stop 请求失败: %v\n", err)
+			}
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(6 * time.Second):
+			fmt.Println("⚠️  stop 请求超时，强制退出")
+		}
+		os.Exit(0)
+	}()
+
 	// 创建打印器
-	printer := client.NewSimplePrinter()
-	interactiveHandler := client.NewInteractiveHandler(agentClient, 0)
+	simplePrinter := printer.NewSimplePrinter()
+	interactiveHandler := interactive.NewHandler(agentClient, 0)
 
 	// 交互循环
 	reader := bufio.NewReader(os.Stdin)
@@ -90,22 +140,24 @@ func main() {
 		fmt.Println(strings.Repeat("-", 60))
 
 		// 发送消息
-		printer.Reset()
+		simplePrinter.Reset()
 		events := agentClient.Chat(ctx, threadID, input)
 
-		processChatEvents(events, printer, interactiveHandler, ctx, threadID)
+		processChatEvents(events, simplePrinter, interactiveHandler, ctx, threadID)
 
 		fmt.Println()
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Println()
 	}
+
+	return nil
 }
 
 // processChatEvents 处理 SSE 事件流，支持交互事件检测和流恢复
 func processChatEvents(
-	events <-chan *client.ChatEvent,
-	printer *client.SimplePrinter,
-	handler *client.InteractiveHandler,
+	events <-chan *types.ChatEvent,
+	simplePrinter *printer.SimplePrinter,
+	handler *interactive.Handler,
 	ctx context.Context,
 	threadID string,
 ) {
@@ -121,51 +173,17 @@ func processChatEvents(
 		}
 
 		// 正常输出（先输出，确保交互事件内容可见）
-		text := printer.ProcessEvent(event)
+		text := simplePrinter.ProcessEvent(event)
 		if text != "" {
 			fmt.Print(text)
 		}
 
 		// 检测交互事件（在输出之后，确保用户看到交互内容）
-		interactiveResp := extractChatInteractiveEvent(event, handler)
+		interactiveResp := interactive.ExtractResponse(ctx, event, handler)
 		if interactiveResp != nil {
 			variables := map[string]any{}
 			events = handler.ResumeChat(ctx, threadID, interactiveResp, variables)
 			continue
 		}
 	}
-}
-
-// extractChatInteractiveEvent 从 ChatEvent 中检测交互事件并处理用户响应
-func extractChatInteractiveEvent(event *client.ChatEvent, handler *client.InteractiveHandler) *client.InteractiveResponse {
-	if event.Body == nil || event.Body.Messages == nil {
-		return nil
-	}
-
-	var body struct {
-		Messages []types.MessageItem `json:"messages"`
-	}
-	if err := json.Unmarshal([]byte(event.RawJSON), &body); err != nil {
-		return nil
-	}
-
-	for _, msg := range body.Messages {
-		for _, evt := range msg.Events {
-			if evt.Type != types.EventTypeInteractive {
-				continue
-			}
-
-			resp, err := handler.HandleEvent(context.Background(), evt, msg.CallID)
-			if err != nil {
-				fmt.Printf("⚠️ 交互处理失败: %v\n", err)
-				return nil
-			}
-			if resp == nil {
-				return nil
-			}
-
-			return resp
-		}
-	}
-	return nil
 }

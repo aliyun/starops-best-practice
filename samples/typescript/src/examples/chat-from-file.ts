@@ -4,8 +4,8 @@
  * Load requests from file example
  *
  * Usage:
- *   npm run chat-from-file -- -file ../../sample-requests/entity.json
- *   npm run chat-from-file -- -dir ../../sample-requests/
+ *   npm run chat-from-file -- --file ../../sample-requests/entity.json
+ *   npm run chat-from-file -- --dir ../../sample-requests/
  */
 
 import * as fs from 'fs';
@@ -18,32 +18,61 @@ interface Args {
   simpleMode: boolean;
   outputDir: string;
   simulateError: boolean;
+  mockMode: boolean;
+  recordMode: boolean;
+  mockInput: string;
+  mockFile: string;
 }
 
 function parseArgs(): Args {
   const args: Args = {
     simpleMode: false,
-    outputDir: '../logs',
+    outputDir: '../.starops-samples/logs',
     simulateError: false,
+    mockMode: false,
+    recordMode: false,
+    mockInput: '',
+    mockFile: '',
   };
 
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
       case '-file':
+      case '--file':
         args.filePath = argv[++i];
         break;
       case '-dir':
+      case '--dir':
         args.dirPath = argv[++i];
         break;
       case '-simple':
+      case '--simple':
         args.simpleMode = true;
         break;
       case '-output':
+      case '--output':
         args.outputDir = argv[++i];
         break;
       case '-simulate-error':
+      case '--simulate-error':
         args.simulateError = true;
+        break;
+      case '-mock':
+      case '--mock':
+        args.mockMode = true;
+        break;
+      case '-record':
+      case '--record':
+        args.recordMode = true;
+        break;
+      case '-mock-input':
+      case '--mock-input':
+        args.mockInput = argv[++i] || '';
+        break;
+      case '-mock-file':
+      case '--mock-file':
+        args.mockFile = argv[++i];
         break;
     }
   }
@@ -55,7 +84,8 @@ async function processFile(
   client: AgentClient,
   filePath: string,
   outputDir: string,
-  simpleMode: boolean
+  simpleMode: boolean,
+  mockInput: string
 ): Promise<void> {
   try {
     // Load request file
@@ -76,6 +106,22 @@ async function processFile(
     // Create thread
     const threadId = await client.createThread();
 
+    // 捕获中断信号，发送 stop 请求
+    const stopWithTimeout = async () => {
+      console.log('\n⏹️  正在停止对话...');
+      try {
+        await Promise.race([
+          client.stop(threadId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+        ]);
+      } catch (e) {
+        console.error(`⚠️  stop 请求超时或失败: ${(e as Error).message}`);
+      }
+      process.exit(0);
+    };
+    process.on('SIGINT', stopWithTimeout);
+    process.on('SIGTERM', stopWithTimeout);
+
     // Create output file
     const outputFile = createOutputFile(filePath, outputDir);
 
@@ -95,6 +141,7 @@ async function processFile(
     const simplePrinter = simpleMode ? new SimplePrinter() : null;
     const eventPrinter = simpleMode ? null : new EventPrinter(false, true);
     const interactiveHandler = new InteractiveHandler(client);
+    if (mockInput) interactiveHandler.setMockInput(mockInput);
     let eventIndex = 0;
 
     let events = client.chatWithVariables(threadId, message, variables);
@@ -175,7 +222,8 @@ async function processDirectory(
   client: AgentClient,
   dirPath: string,
   outputDir: string,
-  simpleMode: boolean
+  simpleMode: boolean,
+  mockInput: string
 ): Promise<void> {
   const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.json'));
   if (files.length === 0) {
@@ -187,7 +235,7 @@ async function processDirectory(
 
   for (let i = 0; i < files.length; i++) {
     console.log(`━━━ [${i + 1}/${files.length}] ${files[i]} ━━━`);
-    await processFile(client, path.join(dirPath, files[i]), outputDir, simpleMode);
+    await processFile(client, path.join(dirPath, files[i]), outputDir, simpleMode, mockInput);
     console.log();
   }
 
@@ -233,8 +281,9 @@ async function main() {
 
   if (!args.filePath && !args.dirPath) {
     console.log('用法:');
-    console.log('  -file <path>   处理单个文件');
-    console.log('  -dir <path>    处理目录下所有 JSON 文件');
+    console.log('  --file <path>       处理单个文件');
+    console.log('  --dir <path>        处理目录下所有 JSON 文件');
+    console.log('  --mock-file <path>  指定 mock 文件路径');
     process.exit(1);
   }
 
@@ -249,6 +298,20 @@ async function main() {
       cfg.simulateNetworkError = true;
       console.log('⚠️  已启用网络断连模拟，将在收到首个事件后触发重试');
     }
+    if (args.mockMode) {
+      cfg.mockMode = true;
+      cfg.mockFile = args.mockFile || (args.filePath ? args.filePath + '.mock' : '');
+      cfg.mockInput = args.mockInput;
+      console.log(`🎭 Mock 模式，回放文件: ${cfg.mockFile}`);
+      if (args.mockInput) console.log(`🤖 Mock 交互输入: ${args.mockInput}`);
+    }
+    if (args.recordMode) {
+      cfg.recordMode = true;
+      cfg.mockFile = args.mockFile || (args.filePath ? args.filePath + '.mock' : '');
+      cfg.mockInput = args.mockInput;
+      console.log(`📝 录制模式，输出文件: ${cfg.mockFile}`);
+      if (args.mockInput) console.log(`🤖 录制交互输入: ${args.mockInput}`);
+    }
 
     // Create client
     const client = new AgentClient(cfg);
@@ -258,9 +321,9 @@ async function main() {
 
     // Process files
     if (args.dirPath) {
-      await processDirectory(client, args.dirPath, args.outputDir, args.simpleMode);
+      await processDirectory(client, args.dirPath, args.outputDir, args.simpleMode, args.mockInput);
     } else if (args.filePath) {
-      await processFile(client, args.filePath, args.outputDir, args.simpleMode);
+      await processFile(client, args.filePath, args.outputDir, args.simpleMode, args.mockInput);
     }
   } catch (e) {
     if (e instanceof SDKException) {

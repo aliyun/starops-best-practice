@@ -95,8 +95,8 @@ npm run chat-from-file -- -file ../sample-requests/entity.json -simulate-error
 | 变量 | 必需 | 默认值 | 说明 |
 |------|------|--------|------|
 | `STAROPS_ENDPOINT` | ✅ | — | STAROps API 端点，如 `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | ✅ | — | 工作空间 ID |
-| `STAROPS_REGION` | ❌ | `cn-hangzhou` | 地域（需与端点匹配） |
+| `STAROPS_WORKSPACE` | ❌ | — | 工作空间 ID，可选，不填写时程序也可运行 |
+| `STAROPS_REGION` | ❌ | `cn-beijing` | 数据查询所在的阿里云地域，与服务接入点（endpoint）无关 |
 | `STAROPS_EMPLOYEE_NAME` | ❌ | `apsara-ops` | 数字员工名称 |
 | `STAROPS_MAX_RETRIES` | ❌ | `10` | SSE 最大重连次数 |
 | `STAROPS_IDLE_TIMEOUT` | ❌ | `60` | 空闲超时秒数，超时未收到消息则重连 |
@@ -128,7 +128,7 @@ typescript/
 ├── src/
 │   ├── client/        # 核心客户端：对话、会话、重试、打印器
 │   ├── types/         # 类型定义
-│   └── examples/      # chat、chat-from-file、thread-manager
+│   └── examples/      # chat、chat-from-file
 ├── tests/             # 测试用例（vitest）
 ├── package.json
 ├── tsconfig.json

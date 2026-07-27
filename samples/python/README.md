@@ -50,12 +50,17 @@ python -m starops_sdk_samples.examples.chat_from_file -file ../sample-requests/e
 By default the detailed `EventPrinter` shows role, content, tool calls, agent calls, and durations.
 Use `-simple` to switch to text-only output.
 
-### thread_manager — manage threads
+### Stop on interrupt
+
+While a chat is running, press `Ctrl+C` (or send `SIGTERM`). The client sends a `stop` request (`action="stop"`) to interrupt the ongoing response, then exits. The request is best-effort with a short timeout so the process never hangs.
+
+## Mock playback
+
+Replay a recorded SSE session offline — no credentials or network required:
 
 ```bash
-python -m starops_sdk_samples.examples.thread_manager list                # list threads
-python -m starops_sdk_samples.examples.thread_manager get <thread-id>     # thread details
-python -m starops_sdk_samples.examples.thread_manager delete <thread-id>  # delete a thread
+make python-mock
+# or: python -m starops_sdk_samples.examples.chat_from_file -file ../sample-requests/data_agent.json -mock-file <mock-file> -mock -simple
 ```
 
 ## SSE Retry & Reconnection
@@ -93,8 +98,8 @@ deduplicates by timestamp, and finishes at `stream_done`.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `STAROPS_ENDPOINT` | ✅ | — | STAROps API endpoint, e.g. `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | ✅ | — | Workspace ID |
-| `STAROPS_REGION` | ❌ | `cn-hangzhou` | Region (should match the endpoint) |
+| `STAROPS_WORKSPACE` | ❌ | — | Workspace ID. Optional. The sample runs without it. |
+| `STAROPS_REGION` | ❌ | `cn-beijing` | Alibaba Cloud region where data queries are performed; independent of the service endpoint |
 | `STAROPS_EMPLOYEE_NAME` | ❌ | `apsara-ops` | Digital employee name |
 | `STAROPS_MAX_RETRIES` | ❌ | `10` | Max SSE reconnect attempts |
 | `STAROPS_IDLE_TIMEOUT` | ❌ | `60` | Idle timeout (seconds); reconnect if no message arrives within this window |
@@ -134,7 +139,7 @@ python/
 │   ├── client/        # Core client: chat, threads, retry, printers
 │   ├── types/         # Type definitions
 │   ├── logger/        # Logging utilities
-│   └── examples/      # chat, chat_from_file, thread_manager
+│   └── examples/      # chat, chat_from_file
 ├── tests/             # Test suite
 ├── pyproject.toml
 └── README.md

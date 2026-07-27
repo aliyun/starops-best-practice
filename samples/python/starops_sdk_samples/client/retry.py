@@ -1,5 +1,9 @@
 """
-SSE 重试逻辑：配置、状态与工具函数
+retry.py — SSE 流重连与指数退避
+职责：管理 SSE 连接生命周期，断线后自动重连、指数退避、消息去重、空闲超时检测。
+不做：不解析事件内容、不做输出(→event_printer.py)、不处理交互。
+依赖：starops SDK (CreateChat API)、errors.py
+
 SSE retry logic: config, state and utility functions
 
 跨语言设计规格（与 Go 参考实现保持一致）：

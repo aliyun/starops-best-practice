@@ -1,6 +1,8 @@
 /**
- * Agent client for STAROps SDK
- * STAROps SDK Agent 客户端
+ * agent-client.ts — 主客户端入口
+ * 职责：初始化 SDK 客户端、加载配置(.env)、发起对话请求、分发 SSE 事件流。
+ * 不做：不处理重连(→retry.ts)、不处理交互(→interactive-handler.ts)、不做输出格式化(→event-printer.ts)。
+ * 依赖：starops SDK、credentials.ts、retry.ts
  */
 
 import Starops20260428Module, * as $Starops20260428 from '@alicloud/starops20260428';
@@ -8,6 +10,7 @@ import * as $OpenApi from '@alicloud/openapi-client';
 import * as $dara from '@darabonba/typescript';
 import { Config } from './config.js';
 import { SDKException, ErrorCode } from './errors.js';
+import { ChatEvent, ThreadInfo, ThreadMessage, isDoneMessage } from '../types/events.js';
 import {
   RetryConfig,
   RetryState,
@@ -18,45 +21,17 @@ import {
   isStreamDoneEvent,
   buildReconnectRequest,
 } from './retry.js';
+import * as mock from './mock.js';
+
+const DEFAULT_LANGUAGE = 'zh';
+const DEFAULT_TIMEZONE = 'Asia/Shanghai';
 
 // Handle ESM/CJS interop
 const Starops20260428Client = (Starops20260428Module as any).default || Starops20260428Module;
 
-/** 聊天事件 / Chat event */
-export interface ChatEvent {
-  id?: string;
-  event?: string;
-  body?: Record<string, unknown>;
-  rawJson: string;
-  statusCode: number;
-  isDone: boolean;
-  error?: Error;
-}
-
-/** 会话信息 / Thread information */
-export interface ThreadInfo {
-  threadId: string;
-  title: string;
-  status: string;
-  createTime: string;
-  updateTime: string;
-}
-
-/** 会话消息 / Thread message */
-export interface ThreadMessage {
-  role: string;
-  content: string;
-  timestamp: string;
-}
-
-export function isDoneMessage(body?: Record<string, unknown>): boolean {
-  // 优先使用 response 级别的 event 字段
-  if (body?.event === 'done') return true;
-  // fallback: 遍历 messages
-  if (!body || !body.messages) return false;
-  const messages = body.messages as Array<Record<string, unknown>>;
-  return messages.some((msg) => msg.type === 'done');
-}
+// Re-export types for backwards compatibility
+export type { ChatEvent, ThreadInfo, ThreadMessage } from '../types/events.js';
+export { isDoneMessage } from '../types/events.js';
 
 /** Agent 客户端 / Agent client */
 export class AgentClient {
@@ -85,6 +60,7 @@ export class AgentClient {
 
   /** 创建会话 / Create thread */
   async createThread(attributes?: Record<string, string>): Promise<string> {
+    if (this.config.mockMode) return 'mock-thread-001';
     try {
       const variables = new $Starops20260428.CreateThreadRequestVariables({
         workspace: this.config.workspace,
@@ -111,13 +87,40 @@ export class AgentClient {
     }
   }
 
+  /** 发送停止请求，中断正在进行的对话 / Send stop request */
+  async stop(threadId: string, variables?: Record<string, unknown>): Promise<void> {
+    if (this.config.mockMode) return;
+    const vars: Record<string, unknown> = variables ?? {};
+    const now = Math.floor(Date.now() / 1000);
+    vars.workspace ??= this.config.workspace;
+    vars.region ??= this.config.region;
+    vars.language ??= DEFAULT_LANGUAGE;
+    vars.timeZone ??= DEFAULT_TIMEZONE;
+    vars.timeStamp ??= String(now);
+    vars.startTime ??= String(now - 15 * 60);
+    vars.endTime ??= String(now);
+
+    const request = new $Starops20260428.CreateChatRequest({
+      action: 'stop',
+      threadId,
+      digitalEmployeeName: this.config.employeeName,
+      variables: vars,
+    });
+    const runtime = new $dara.RuntimeOptions({ readTimeout: 5000, connectTimeout: 3000 });
+    try {
+      await this.client.createChatWithOptions(request, {}, runtime);
+    } catch (e) {
+      console.error(`⚠️  stop 请求失败: ${(e as Error).message}`);
+    }
+  }
+
   /** 开始 SSE 对话 / Start SSE chat */
   async *chat(threadId: string, message: string): AsyncIterable<ChatEvent> {
     const variables: Record<string, unknown> = {
       workspace: this.config.workspace,
       region: this.config.region,
-      language: 'zh',
-      timeZone: 'Asia/Shanghai',
+      language: DEFAULT_LANGUAGE,
+      timeZone: DEFAULT_TIMEZONE,
       timeStamp: String(Math.floor(Date.now() / 1000)),
     };
     yield* this.chatWithVariables(threadId, message, variables);
@@ -143,8 +146,8 @@ export class AgentClient {
       const vars = variables || {};
       vars.workspace = vars.workspace || this.config.workspace;
       vars.region = vars.region || this.config.region;
-      vars.language = vars.language || 'zh';
-      vars.timeZone = vars.timeZone || 'Asia/Shanghai';
+      vars.language = vars.language || DEFAULT_LANGUAGE;
+      vars.timeZone = vars.timeZone || DEFAULT_TIMEZONE;
       vars.timeStamp = vars.timeStamp || String(Math.floor(Date.now() / 1000));
 
       const request = new $Starops20260428.CreateChatRequest({
@@ -154,6 +157,27 @@ export class AgentClient {
         messages: [msg],
         variables: vars,
       });
+
+      // Mock/Record 模式：直接拦截，不经过 streamSSE
+      if (this.config.mockMode || this.config.recordMode) {
+        const realStream = async function* (this: AgentClient) {
+          const runtime = new $dara.RuntimeOptions({ readTimeout: 300000, connectTimeout: 30000 });
+          const ri = await this.client.createChatWithSSE(request, {}, runtime);
+          for await (const resp of ri) {
+            yield { id: resp.id, event: resp.event, body: resp.body, statusCode: 200 };
+          }
+        };
+        for await (const raw of mock.openSSEStream(this.config, request, realStream.bind(this))) {
+          const r = raw as Record<string, unknown>;
+          const bodyObj = r.body as Record<string, unknown> | undefined;
+          yield {
+            id: (r.id as string) || '', event: undefined,
+            body: bodyObj, rawJson: bodyObj ? JSON.stringify(bodyObj) : '',
+            statusCode: (r.statusCode as number) || 200, isDone: false,
+          };
+        }
+        return;
+      }
 
       // 使用带重试能力的编排层处理 SSE 流
       const config = loadRetryConfigFromEnv();
@@ -186,8 +210,8 @@ export class AgentClient {
       vars.userInteractive = userInteractive;
       vars.workspace = vars.workspace || this.config.workspace;
       vars.region = vars.region || this.config.region;
-      vars.language = vars.language || 'zh';
-      vars.timeZone = vars.timeZone || 'Asia/Shanghai';
+      vars.language = vars.language || DEFAULT_LANGUAGE;
+      vars.timeZone = vars.timeZone || DEFAULT_TIMEZONE;
       vars.timeStamp = vars.timeStamp || String(Math.floor(Date.now() / 1000));
 
       const request = new $Starops20260428.CreateChatRequest({
@@ -196,6 +220,27 @@ export class AgentClient {
         digitalEmployeeName: this.config.employeeName,
         variables: vars,
       });
+
+      // Mock/Record 模式
+      if (this.config.mockMode || this.config.recordMode) {
+        const realStream = async function* (this: AgentClient) {
+          const runtime = new $dara.RuntimeOptions({ readTimeout: 300000, connectTimeout: 30000 });
+          const ri = await this.client.createChatWithSSE(request, {}, runtime);
+          for await (const resp of ri) {
+            yield { id: resp.id, event: resp.event, body: resp.body, statusCode: 200 };
+          }
+        };
+        for await (const raw of mock.openSSEStream(this.config, request, realStream.bind(this))) {
+          const r = raw as Record<string, unknown>;
+          const bodyObj = r.body as Record<string, unknown> | undefined;
+          yield {
+            id: (r.id as string) || '', event: undefined,
+            body: bodyObj, rawJson: bodyObj ? JSON.stringify(bodyObj) : '',
+            statusCode: (r.statusCode as number) || 200, isDone: false,
+          };
+        }
+        return;
+      }
 
       const runtime = new $dara.RuntimeOptions({
         readTimeout: 120000,
@@ -577,6 +622,7 @@ export class AgentClient {
         // 非 stream_done 的任何错误都视为连接中断，触发重连
         console.error(`SSE 连接错误: ${err}，准备重连...`);
         console.log('连接中断，中断原因：SSE连接错误');
+        await this.closeIterator(iterator);
         return ConnectionOutcome.INTERRUPTED;
       }
       if (timer) clearTimeout(timer);
@@ -585,6 +631,7 @@ export class AgentClient {
         // 放弃当前连接，吞掉遗留 Promise 以避免未处理的 rejection
         nextPromise.catch(() => {});
         console.log('连接中断，中断原因：空闲超时，未收到消息');
+        await this.closeIterator(iterator);
         return ConnectionOutcome.INTERRUPTED;
       }
 
@@ -629,6 +676,19 @@ export class AgentClient {
           console.error('模拟网络断连，触发重连...');
           return ConnectionOutcome.INTERRUPTED;
         }
+      }
+    }
+  }
+
+  /**
+   * 显式关闭底层 SSE 迭代器，释放连接资源（避免 idle timeout 后流泄漏）
+   */
+  private async closeIterator(iterator: AsyncIterator<any>): Promise<void> {
+    if (typeof iterator.return === 'function') {
+      try {
+        await iterator.return();
+      } catch {
+        // 忽略关闭时的错误
       }
     }
   }

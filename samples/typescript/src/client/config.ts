@@ -18,6 +18,10 @@ export interface Config {
   employeeName: string;
   retryConfig?: RetryConfig; // 重试配置，未设置时使用默认配置
   simulateNetworkError?: boolean; // 模拟网络断连，用于测试重试逻辑
+  mockMode?: boolean; // Mock 模式：回放预录制的 SSE 事件流
+  recordMode?: boolean; // 录制模式：旁路捕获 SSE 事件写入文件
+  mockFile?: string; // Mock/Record 文件路径
+  mockInput?: string; // Mock 交互输入：自动回复交互事件
 }
 
 /** 从环境变量加载配置 / Load configuration from environment variables */
@@ -26,7 +30,7 @@ export async function loadConfigFromEnv(): Promise<Config> {
 
   const workspace = process.env.STAROPS_WORKSPACE || '';
   const endpoint = process.env.STAROPS_ENDPOINT || '';
-  const region = process.env.STAROPS_REGION || 'cn-hangzhou';
+  const region = process.env.STAROPS_REGION || 'cn-beijing';
   let accessKeyId = process.env.ALIBABA_CLOUD_ACCESS_KEY_ID || '';
   let accessKeySecret = process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET || '';
   const employeeName = process.env.STAROPS_EMPLOYEE_NAME || 'apsara-ops';
@@ -57,7 +61,7 @@ export async function loadConfigFromEnv(): Promise<Config> {
     endpoint,
     accessKeyId,
     accessKeySecret,
-    region: region || 'cn-hangzhou',
-    employeeName: employeeName || 'default',
+    region: region || 'cn-beijing',
+    employeeName: employeeName || 'apsara-ops',
   };
 }

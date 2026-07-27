@@ -9,9 +9,6 @@ description = "Alibaba Cloud STAROps SDK samples for Python"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
-authors = [
-    {name = "Alibaba Cloud", email = "support@alibabacloud.com"}
-]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -40,7 +37,6 @@ dev = [
 [project.scripts]
 starops-chat = "starops_sdk_samples.examples.chat:main"
 starops-chat-from-file = "starops_sdk_samples.examples.chat_from_file:main"
-starops-chat-interactive = "starops_sdk_samples.examples.chat_interactive:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

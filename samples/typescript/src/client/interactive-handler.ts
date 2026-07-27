@@ -1,12 +1,23 @@
 /**
- * Interactive handler for STAROps SDK
- * STAROps SDK 交互处理器
+ * interactive-handler.ts — 交互事件处理（user_ack / user_select / user_input）
+ * 职责：接收 Agent 发出的交互事件，在终端收集用户响应，构建 userInteractive 回传请求。
+ * 不做：不发起对话、不处理重连、不做事件格式化输出。
+ * 依赖：agent-client.ts、types/index.ts
  */
 
 import * as readline from 'readline';
 import { EventType, InteractionType } from '../types/index.js';
-import { AgentClient, ChatEvent } from './agent-client.js';
+import { ChatEvent } from '../types/events.js';
 import { SDKException, ErrorCode } from './errors.js';
+
+/** 聊天客户端接口 / Chat client interface */
+export interface ChatClient {
+  interact(
+    threadId: string,
+    userInteractive: string,
+    baseVariables?: Record<string, unknown>
+  ): AsyncIterable<ChatEvent>;
+}
 
 /** 交互响应 / Interactive response */
 export interface InteractiveResponse {
@@ -21,13 +32,18 @@ export interface InteractiveResponse {
 
 /** 交互事件处理器 / Interactive event handler */
 export class InteractiveHandler {
-  private client: AgentClient;
+  private client: ChatClient;
   private timeout?: number;
   private rl?: readline.Interface;
+  private mockInput?: string;
 
-  constructor(client: AgentClient, timeout?: number) {
+  constructor(client: ChatClient, timeout?: number) {
     this.client = client;
     this.timeout = timeout;
+  }
+
+  setMockInput(input: string): void {
+    this.mockInput = input;
   }
 
   /** 处理交互事件 / Handle interactive event */
@@ -274,6 +290,11 @@ export class InteractiveHandler {
   // =================================================================================
 
   private async prompt(question: string): Promise<string> {
+    if (this.mockInput) {
+      const input = this.mockInput;
+      this.mockInput = undefined; // 一次性消费
+      return input;
+    }
     return new Promise((resolve) => {
       this.rl = readline.createInterface({
         input: process.stdin,

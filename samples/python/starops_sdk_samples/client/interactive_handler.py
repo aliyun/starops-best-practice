@@ -1,17 +1,33 @@
 """
-Interactive handler for STAROps SDK
-STAROps SDK 交互处理器
+interactive_handler.py — 交互事件处理（user_ack / user_select / user_input）
+职责：接收 Agent 发出的交互事件，在终端收集用户响应，构建 userInteractive 回传请求。
+不做：不发起对话、不处理重连、不做事件格式化输出。
+依赖：agent_client.py、types/events.py
 """
 
 import json
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, List, Optional, TextIO
+from typing import Any, AsyncIterator, Dict, List, Optional, TextIO, Protocol, runtime_checkable
 
 from ..types import EventType, InteractionType
-from .agent_client import AgentClient, ChatEvent
+from ..types.events import ChatEvent
 from .errors import SDKException, ErrorCode
+
+
+@runtime_checkable
+class ChatClientProtocol(Protocol):
+    """聊天客户端协议 / Chat client protocol
+
+    InteractiveHandler only depends on the interact() method,
+    so any client implementing this protocol can be used.
+    """
+
+    def interact(
+        self, thread_id: str, user_interactive: str,
+        base_variables: Optional[Dict[str, Any]] = None,
+    ) -> AsyncIterator[ChatEvent]: ...
 
 
 @dataclass
@@ -31,7 +47,7 @@ class InteractiveHandler:
 
     def __init__(
         self,
-        client: AgentClient,
+        client: ChatClientProtocol,
         timeout: Optional[float] = None,
         reader: Optional[TextIO] = None,
         writer: Optional[TextIO] = None,
@@ -40,6 +56,10 @@ class InteractiveHandler:
         self.timeout = timeout
         self.reader = reader or sys.stdin
         self.writer = writer or sys.stdout
+        self.mock_input: Optional[str] = None
+
+    def set_mock_input(self, input_str: str) -> None:
+        self.mock_input = input_str
 
     def handle_event(self, event: Dict[str, Any], call_id: str) -> InteractiveResponse:
         """处理交互事件 / Handle interactive event"""
@@ -280,6 +300,10 @@ class InteractiveHandler:
             raise SDKException(ErrorCode.PARSE_ERROR, "读取输入失败", e)
 
     def _read_input(self) -> str:
+        if self.mock_input is not None:
+            input_str = self.mock_input
+            self.mock_input = None  # 一次性消费
+            return input_str
         try:
             return self.reader.readline()
         except Exception as e:

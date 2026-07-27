@@ -1,3 +1,8 @@
+// inputs.go — 请求输入参数与 UserContext 类型定义
+// 职责：定义 UserInputParams、UserContext 及其各 type 对应的 Data 结构。
+// 不做：不包含任何逻辑，纯数据结构。
+// 依赖：无
+// ⚠️ 同步要求：新增 UserContextType 时必须同步 Java/Java8/Python/TypeScript。
 package types
 
 type UserInputParams struct {

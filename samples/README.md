@@ -21,6 +21,8 @@ stream responses over SSE, handle interactive events, and recover from transient
 - **Automatic reconnection**: Resume after dropped connections, SSE errors, or idle timeouts.
 - **Exponential backoff**: Retry with bounded backoff to avoid aggressive reconnect loops.
 - **Message deduplication**: Skip already received messages after reconnecting.
+- **Stop on interrupt**: Press `Ctrl+C` (SIGINT/SIGTERM) during a running chat to send a `stop` request and cleanly interrupt the ongoing response.
+- **Mock playback**: Replay recorded SSE sessions offline via `--mock-file` (no credentials or network needed), useful for demos and tests.
 - **Credential configuration**: Prefer Alibaba Cloud CLI-based credential configuration; environment variables can be used when CLI installation is not desired.
 - **Shared request fixtures**: Reuse the same JSON request files across languages.
 - **Consistent examples**: Run interactive chat, file-based chat, and thread management in every language.
@@ -33,7 +35,7 @@ stream responses over SSE, handle interactive events, and recover from transient
 ```text
 .
 ├── README.md / README_zh.md
-├── sample-requests/              # Shared STAROps request examples
+├── sample-requests/              # Shared STAROps request examples ([docs](sample-requests/README.md))
 ├── golang/                        # Go 1.22+ sample client
 ├── java/                          # Java 11+ sample client
 ├── java8/                         # Java 8-compatible sample client
@@ -66,7 +68,7 @@ Required `.env` values:
 | Variable | Description |
 | --- | --- |
 | `STAROPS_ENDPOINT` | STAROps endpoint, for example `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | STAROps workspace ID |
+| `STAROPS_WORKSPACE` | STAROps workspace ID. Optional. The sample runs without it. |
 | `STAROPS_EMPLOYEE_NAME` | Digital employee name |
 
 Credential configuration:
@@ -84,9 +86,10 @@ Optional retry settings:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `STAROPS_REGION` | Derived from endpoint when possible | Alibaba Cloud region |
+| `STAROPS_REGION` | `cn-beijing` | Alibaba Cloud region where data queries are performed; independent of the service endpoint |
 | `STAROPS_MAX_RETRIES` | `10` | Maximum SSE reconnect attempts |
 | `STAROPS_IDLE_TIMEOUT` | `60` | Seconds to wait before treating a stream as idle |
+| `STAROPS_LOG_LEVEL` | `info` | Log level: `debug` / `info` / `warn` / `error` |
 
 > [!TIP]
 > `.env` is only for STAROps sample settings. Configure credentials with Alibaba Cloud CLI or AK/SK environment variables.
@@ -124,18 +127,15 @@ The [`sample-requests/`](sample-requests/) directory contains request fixtures t
 
 | File | Scenario |
 | --- | --- |
-| `general_chat.json` | General conversation |
-| `entity.json` | Entity-based query |
-| `metric_query.json` | Metric query |
-| `sql_generation.json` | Natural language to SQL |
-| `sls_chat.json` | SLS-focused chat |
 | `data_agent.json` | Data-agent analysis |
+| `sls_chat.json` | SLS-focused chat |
 | `user_ack_interactive.json` | User acknowledgement interaction |
 | `user_input_interactive.json` | User input interaction |
+| `request_with_reminder.json` | Complete request body with metadata + dynamic context |
 
 ## Example programs
 
-Each language provides the same three entry points:
+Each language provides the same two entry points:
 
 | Program | Purpose |
 | --- | --- |
@@ -169,26 +169,6 @@ You can exercise the retry path with `-simulate-error`:
 ```bash
 cd golang
 go run ./cmd/chat-from-file -file ../sample-requests/data_agent.json -simulate-error true
-```
-
-## VS Code debugging
-
-The repository includes `.vscode/launch.json` with launch configurations for Go, Python, Java, Java 8, and TypeScript.
-
-For Java and Java 8 debugging, compile and copy Maven dependencies first:
-
-```bash
-mvn -q -f java/pom.xml -DskipTests dependency:copy-dependencies
-mvn -q -f java8/pom.xml -DskipTests dependency:copy-dependencies
-```
-
-The launch configurations use explicit classpaths:
-
-```text
-java/target/classes
-java/target/dependency/*
-java8/target/classes
-java8/target/dependency/*
 ```
 
 ## Development checks
