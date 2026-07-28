@@ -12,9 +12,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.alibaba.cloud.starops.samples.client.AgentClient;
-import com.alibaba.cloud.starops.samples.client.ChatEvent;
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.alibaba.cloud.starops.samples.client.Config;
 import com.alibaba.cloud.starops.samples.client.EventPrinter;
 import com.alibaba.cloud.starops.samples.client.InteractiveHandler;
@@ -29,15 +30,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * Load requests from file example
  *
  * Usage:
- *   mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ChatFromFile" -Dexec.args="-file ../../sample-requests/entity.json"
- *   mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ChatFromFile" -Dexec.args="-dir ../../sample-requests/"
+ *   mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ChatFromFile" -Dexec.args="--file ../../sample-requests/entity.json"
+ *   mvn exec:java -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.ChatFromFile" -Dexec.args="--dir ../../sample-requests/"
  */
 public class ChatFromFile {
     private static String filePath = null;
     private static String dirPath = null;
     private static boolean simpleMode = false;
-    private static String outputDir = "../../logs";
+    private static String outputDir = "../.starops-samples/logs";
     private static boolean simulateError = false;
+    private static boolean mockMode = false;
+    private static boolean recordMode = false;
+    private static String mockInput = "";
+    private static String mockFile = null;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args) {
@@ -58,6 +63,20 @@ public class ChatFromFile {
             if (simulateError) {
                 cfg.setSimulateNetworkError(true);
                 System.out.println("⚠️  已启用网络断连模拟，将在收到首个事件后触发重试");
+            }
+            if (mockMode) {
+                cfg.setMockMode(true);
+                cfg.setMockFile(mockFile != null ? mockFile : (filePath != null ? filePath + ".mock" : ""));
+                cfg.setMockInput(mockInput);
+                System.out.println("🎭 Mock 模式，回放文件: " + cfg.getMockFile());
+                if (!mockInput.isEmpty()) System.out.println("🤖 Mock 交互输入: " + mockInput);
+            }
+            if (recordMode) {
+                cfg.setRecordMode(true);
+                cfg.setMockFile(mockFile != null ? mockFile : (filePath != null ? filePath + ".mock" : ""));
+                cfg.setMockInput(mockInput);
+                System.out.println("📝 录制模式，输出文件: " + cfg.getMockFile());
+                if (!mockInput.isEmpty()) System.out.println("🤖 录制交互输入: " + mockInput);
             }
 
             // Create client
@@ -87,19 +106,40 @@ public class ChatFromFile {
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "-file":
+                case "--file":
                     if (i + 1 < args.length) filePath = args[++i];
                     break;
                 case "-dir":
+                case "--dir":
                     if (i + 1 < args.length) dirPath = args[++i];
                     break;
                 case "-simple":
+                case "--simple":
                     simpleMode = true;
                     break;
                 case "-output":
+                case "--output":
                     if (i + 1 < args.length) outputDir = args[++i];
                     break;
                 case "-simulate-error":
+                case "--simulate-error":
                     simulateError = true;
+                    break;
+                case "-mock":
+                case "--mock":
+                    mockMode = true;
+                    break;
+                case "-record":
+                case "--record":
+                    recordMode = true;
+                    break;
+                case "-mock-input":
+                case "--mock-input":
+                    if (i + 1 < args.length) mockInput = args[++i];
+                    break;
+                case "-mock-file":
+                case "--mock-file":
+                    if (i + 1 < args.length) mockFile = args[++i];
                     break;
             }
         }
@@ -140,6 +180,20 @@ public class ChatFromFile {
 
             // Create thread
             String threadId = client.createThread();
+
+            // 捕获中断信号，发送 stop 请求
+            final AgentClient stopClient = client;
+            final String stopThreadId = threadId;
+            final AtomicBoolean finished = new AtomicBoolean(false);
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    // 正常完成后跳过 stop；仅在 Ctrl+C / 异常中断时发送
+                    if (finished.get()) return;
+                    System.out.println("\n⏹️  正在停止对话...");
+                    stopClient.stop(stopThreadId, null);
+                }
+            }));
 
             // Create output file
             PrintWriter outputFile = createOutputFile(file);
@@ -224,6 +278,8 @@ public class ChatFromFile {
             if (outputFile != null) {
                 outputFile.close();
             }
+            // 标记本文件正常完成，shutdown hook 跳过 stop
+            finished.set(true);
         } catch (Exception e) {
             System.out.printf("❌ 处理文件失败: %s%n", e.getMessage());
         }
@@ -279,19 +335,24 @@ public class ChatFromFile {
 
     private static void printUsage() {
         System.out.println("用法:");
-        System.out.println("  -file <path>   处理单个文件");
-        System.out.println("  -dir <path>    处理目录下所有 JSON 文件");
+        System.out.println("  --file <path>   处理单个文件");
+        System.out.println("  --dir <path>    处理目录下所有 JSON 文件");
         System.out.println();
         System.out.println("示例:");
-        System.out.println("  -file ../../sample-requests/entity.json");
-        System.out.println("  -dir ../../sample-requests/");
-        System.out.println("  -file entity.json -simple");
+        System.out.println("  --file ../../sample-requests/entity.json");
+        System.out.println("  --dir ../../sample-requests/");
+        System.out.println("  --file entity.json --simple");
         System.out.println();
         System.out.println("选项:");
-        System.out.println("  -file     请求 JSON 文件路径");
-        System.out.println("  -dir      请求文件目录");
-        System.out.println("  -simple   简洁模式，只输出最终文本");
-        System.out.println("  -output   输出目录 (默认: output)");
+        System.out.println("  --file       请求 JSON 文件路径");
+        System.out.println("  --dir        请求文件目录");
+        System.out.println("  --simple     简洁模式，只输出最终文本");
+        System.out.println("  --output     输出目录 (默认: ../.starops-samples/logs)");
+        System.out.println("  --mock       Mock 模式，回放录制的响应");
+        System.out.println("  --record     录制模式，录制响应到文件");
+        System.out.println("  --mock-file  指定 mock 文件路径 (默认: <file>.mock)");
+        System.out.println("  --mock-input Mock 交互输入");
+        System.out.println("  --simulate-error  模拟网络断连");
     }
 
     /**

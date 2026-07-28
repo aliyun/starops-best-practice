@@ -5,9 +5,10 @@ import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.alibaba.cloud.starops.samples.client.AgentClient;
-import com.alibaba.cloud.starops.samples.client.ChatEvent;
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.alibaba.cloud.starops.samples.client.Config;
 import com.alibaba.cloud.starops.samples.client.InteractiveHandler;
 import com.alibaba.cloud.starops.samples.client.InteractiveResponse;
@@ -52,6 +53,20 @@ public class Chat {
             String threadId = client.createThread();
             System.out.printf("✅ ThreadID: %s%n%n", threadId);
 
+            // 捕获中断信号，发送 stop 请求
+            final AgentClient stopClient = client;
+            final String stopThreadId = threadId;
+            final AtomicBoolean finished = new AtomicBoolean(false);
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    // 正常完成后跳过 stop；仅在 Ctrl+C / 异常中断时发送
+                    if (finished.get()) return;
+                    System.out.println("\n⏹️  正在停止对话...");
+                    stopClient.stop(stopThreadId, null);
+                }
+            }));
+
             // Create printer
             SimplePrinter printer = new SimplePrinter();
             InteractiveHandler interactiveHandler = new InteractiveHandler(client, null);
@@ -89,6 +104,8 @@ public class Chat {
                 System.out.println();
             }
 
+            // 标记正常退出，shutdown hook 跳过 stop
+            finished.set(true);
             client.shutdown();
         } catch (SDKException e) {
             System.out.printf("❌ 配置加载失败: %s%n", e.getMessage());

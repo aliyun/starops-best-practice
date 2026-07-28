@@ -21,6 +21,8 @@
 - **自动重连**：连接中断、SSE 错误或空闲超时时自动恢复。
 - **指数退避**：使用有上限的退避策略，避免过于频繁地重试。
 - **消息去重**：重连后跳过已接收消息，避免重复输出。
+- **中断停止**：对话运行时按 `Ctrl+C`（SIGINT/SIGTERM）会发送 `stop` 请求，干净地中断当前响应。
+- **Mock 回放**：通过 `--mock-file` 离线回放录制的 SSE 会话，无需凭据和网络，便于演示与测试。
 - **凭据配置**：推荐使用阿里云 CLI 配置权限；不想安装 CLI 时可使用环境变量配置 AK/SK。
 - **共享请求样例**：所有语言复用同一组 JSON 请求文件。
 - **一致示例程序**：每种语言都提供交互式对话、文件请求。
@@ -33,7 +35,7 @@
 ```text
 .
 ├── README.md / README_zh.md
-├── sample-requests/              # 共享 STAROps 请求样例
+├── sample-requests/              # 共享 STAROps 请求样例（[说明文档](sample-requests/README.md)）
 ├── golang/                        # Go 1.22+ 示例客户端
 ├── java/                          # Java 11+ 示例客户端
 ├── java8/                         # Java 8 兼容示例客户端
@@ -66,7 +68,7 @@ cp .env.example .env
 | 变量 | 说明 |
 | --- | --- |
 | `STAROPS_ENDPOINT` | STAROps 端点，例如 `starops.cn-beijing.aliyuncs.com` |
-| `STAROPS_WORKSPACE` | STAROps 工作空间 ID |
+| `STAROPS_WORKSPACE` | STAROps 工作空间 ID。可选，不填写时程序也可运行 |
 | `STAROPS_EMPLOYEE_NAME` | 数字员工名称 |
 
 凭据配置：
@@ -84,7 +86,7 @@ export ALIBABA_CLOUD_ACCESS_KEY_SECRET=<your-access-key-secret>
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `STAROPS_REGION` | 可从 endpoint 推断时自动推断 | 阿里云地域 |
+| `STAROPS_REGION` | `cn-beijing` | 数据查询所在的阿里云地域，与服务接入点（endpoint）无关 |
 | `STAROPS_MAX_RETRIES` | `10` | SSE 最大重连次数 |
 | `STAROPS_IDLE_TIMEOUT` | `60` | 空闲超时秒数，超时未收到消息则重连 |
 
@@ -121,18 +123,15 @@ cd java && mvn exec:java \
 
 | 文件 | 场景 |
 | --- | --- |
-| `general_chat.json` | 通用对话 |
-| `entity.json` | 实体查询 |
-| `metric_query.json` | 指标查询 |
-| `sql_generation.json` | 自然语言生成 SQL |
-| `sls_chat.json` | SLS 相关对话 |
 | `data_agent.json` | 数据 Agent 分析 |
+| `sls_chat.json` | SLS 相关对话 |
 | `user_ack_interactive.json` | 用户确认类交互 |
 | `user_input_interactive.json` | 用户输入类交互 |
+| `request_with_reminder.json` | 完整请求体示例（含 metadata + dynamic 上下文） |
 
 ## 示例程序
 
-每种语言都提供相同的三个入口：
+每种语言都提供相同的两个入口：
 
 | 程序 | 用途 |
 | --- | --- |
@@ -166,26 +165,6 @@ cd java && mvn exec:java \
 ```bash
 cd golang
 go run ./cmd/chat-from-file -file ../sample-requests/data_agent.json -simulate-error true
-```
-
-## VS Code 调试
-
-仓库包含 `.vscode/launch.json`，提供 Go、Python、Java、Java 8 和 TypeScript 的启动配置。
-
-Java 与 Java 8 调试前，先编译并复制 Maven 依赖：
-
-```bash
-mvn -q -f java/pom.xml -DskipTests dependency:copy-dependencies
-mvn -q -f java8/pom.xml -DskipTests dependency:copy-dependencies
-```
-
-启动配置使用显式 classpath：
-
-```text
-java/target/classes
-java/target/dependency/*
-java8/target/classes
-java8/target/dependency/*
 ```
 
 ## 开发检查

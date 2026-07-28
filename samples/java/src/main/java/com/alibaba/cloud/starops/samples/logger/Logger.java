@@ -48,7 +48,7 @@ public class Logger {
     }
 
     public static Logger fromEnv() {
-        String levelStr = System.getenv("LOG_LEVEL");
+        String levelStr = System.getenv("STAROPS_LOG_LEVEL");
         LogLevel level = LogLevel.fromString(levelStr);
         return new Logger(level, System.out);
     }
@@ -107,37 +107,6 @@ public class Logger {
 
     public void error(String message, Throwable error, Map<String, Object> context) {
         log(LogLevel.ERROR, message, context, error, true);
-    }
-
-    public void logRequest(String threadId, String message, Map<String, Object> variables) {
-        Map<String, Object> context = new HashMap<>();
-        context.put("threadId", threadId);
-        context.put("message", message);
-        if (variables != null) {
-            context.put("variables", variables);
-        }
-        debug("发送请求 / Sending request", context);
-    }
-
-    public void logResponse(String threadId, int statusCode, String rawJson, boolean isDone, Throwable error) {
-        Map<String, Object> context = new HashMap<>();
-        context.put("threadId", threadId);
-        context.put("statusCode", statusCode);
-        context.put("isDone", isDone);
-
-        if (rawJson != null && !rawJson.isEmpty()) {
-            if (rawJson.length() > 500) {
-                context.put("rawJSON", rawJson.substring(0, 500) + "...(truncated)");
-            } else {
-                context.put("rawJSON", rawJson);
-            }
-        }
-
-        if (error != null) {
-            error("响应错误 / Response error", error, context);
-        } else {
-            debug("收到响应 / Received response", context);
-        }
     }
 
     private String getStackTrace(Throwable error) {

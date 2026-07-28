@@ -1,5 +1,12 @@
+/**
+ * InteractiveHandler.java — 交互事件处理 (Java 8 兼容版)
+ * 职责：接收 Agent 发出的交互事件，在终端收集用户响应，构建 userInteractive 回传请求。
+ * 不做：不发起对话、不处理重连、不做事件格式化输出。
+ * 依赖：AgentClient、EventType、InteractionType
+ */
 package com.alibaba.cloud.starops.samples.client;
 
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.alibaba.cloud.starops.samples.types.EventType;
 import com.alibaba.cloud.starops.samples.types.InteractionType;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,13 +22,13 @@ import java.util.concurrent.*;
  * Interactive event handler
  */
 public class InteractiveHandler {
-    private final AgentClient client;
+    private final ChatClient client;
     private final Duration timeout;
     private BufferedReader reader;
     private PrintWriter writer;
     private final ObjectMapper objectMapper;
 
-    public InteractiveHandler(AgentClient client, Duration timeout) {
+    public InteractiveHandler(ChatClient client, Duration timeout) {
         this.client = client;
         this.timeout = timeout;
         this.reader = new BufferedReader(new InputStreamReader(System.in));
@@ -304,7 +311,9 @@ public class InteractiveHandler {
             BlockingQueue<ChatEvent> events = new LinkedBlockingQueue<>();
             try {
                 events.put(ChatEvent.error(new SDKException(ErrorCode.CLIENT_CREATE, "客户端未初始化")));
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
             return events;
         }
 
@@ -312,7 +321,9 @@ public class InteractiveHandler {
             BlockingQueue<ChatEvent> events = new LinkedBlockingQueue<>();
             try {
                 events.put(ChatEvent.error(new SDKException(ErrorCode.PARSE_ERROR, "交互响应为空")));
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
             return events;
         }
 
@@ -333,7 +344,9 @@ public class InteractiveHandler {
             BlockingQueue<ChatEvent> events = new LinkedBlockingQueue<>();
             try {
                 events.put(ChatEvent.error(new SDKException(ErrorCode.PARSE_ERROR, "序列化 userInteractive 失败", e)));
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
             return events;
         }
 

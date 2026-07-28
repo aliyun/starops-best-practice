@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SimplePrinter } from '../src/client/simple-printer.js';
-import { ChatEvent } from '../src/client/agent-client.js';
+import { ChatEvent } from '../src/types/events.js';
 
 describe('SimplePrinter', () => {
   let printer: SimplePrinter;

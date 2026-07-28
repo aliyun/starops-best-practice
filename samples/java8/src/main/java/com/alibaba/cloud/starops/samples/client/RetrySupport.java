@@ -1,4 +1,12 @@
+/**
+ * RetrySupport.java — SSE 流重连与指数退避 (Java 8 兼容版)
+ * 职责：管理 SSE 连接生命周期，断线后自动重连、指数退避、消息去重、空闲超时检测。
+ * 不做：不解析事件内容(→ChatEvent)、不做输出(→EventPrinter)、不处理交互。
+ * 依赖：starops SDK (CreateChat API)、ErrorCode
+ */
 package com.alibaba.cloud.starops.samples.client;
+
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,7 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  * SSE 重试支持工具（Java 8 版本，严格 JDK 8 语法）
  * SSE retry support helpers
  *
- * 跨语言对齐 Go 参考实现（samples/golang/internal/client/retry.go）：
+ * 跨语言对齐 Go 参考实现（samples/golang/pkg/client/retry.go）：
  * - 重试触发：所有非 stream_done 的中断均触发重连
  * - 唯一结束：stream_done 是正常结束的唯一标志
  * - 不区分错误：不判断错误类型，一律重试
@@ -205,9 +213,6 @@ public final class RetrySupport {
                 .variables(variables);
 
         if (origReq != null) {
-            if (origReq.getRegionId() != null) {
-                builder.regionId(origReq.getRegionId());
-            }
             if (origReq.getThreadId() != null) {
                 builder.threadId(origReq.getThreadId());
             }

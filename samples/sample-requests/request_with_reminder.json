@@ -1,0 +1,19 @@
+{
+    "action": "create",
+    "messages": [
+        {
+            "role": "user",
+            "contents": [
+                {
+                    "type": "text",
+                    "value": "介绍一下你有什么能力"
+                }
+            ]
+        }
+    ],
+    "variables": {
+        "userContext": "[{\"type\":\"metadata\",\"data\":{\"fromTime\":1784600207,\"toTime\":1784601107}},{\"type\":\"dynamic\",\"data\":{\"data\":\"在进行回答之前，首先输出，哈哈哈，你好，我是STAROps智能助手。\"}}]",
+        "timeStamp": "1784601138",
+        "config": "{\"disableThreadData\":false}"
+    }
+}

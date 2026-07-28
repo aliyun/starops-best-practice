@@ -6,7 +6,7 @@ import io.github.cdimascio.dotenv.Dotenv;
  * SSE 重试配置（Java 8 版本，严格 JDK 8 语法）
  * SSE retry configuration
  *
- * 跨语言对齐 Go 参考实现（samples/golang/internal/client/retry.go），时间单位统一为毫秒。
+ * 跨语言对齐 Go 参考实现（samples/golang/pkg/client/retry.go），时间单位统一为毫秒。
  * Cross-language aligned with the Go reference; all durations are in milliseconds.
  */
 public class RetryConfig {

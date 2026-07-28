@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import json
 import os
+import signal
 import sys
 import time
 from datetime import datetime
@@ -23,11 +24,15 @@ from ..client import AgentClient, Config, SDKException, SimplePrinter, EventPrin
 
 def parse_args():
     parser = argparse.ArgumentParser(description="从文件加载请求")
-    parser.add_argument("-file", dest="file_path", help="请求 JSON 文件路径")
-    parser.add_argument("-dir", dest="dir_path", help="请求文件目录")
-    parser.add_argument("-simple", action="store_true", help="简洁模式")
-    parser.add_argument("-output", default="../logs", help="输出目录")
-    parser.add_argument("-simulate-error", dest="simulate_error", action="store_true", help="模拟网络断连，测试重试逻辑")
+    parser.add_argument("--file", "-file", dest="file_path", help="请求 JSON 文件路径")
+    parser.add_argument("--dir", "-dir", dest="dir_path", help="请求文件目录")
+    parser.add_argument("--simple", "-simple", action="store_true", help="简洁模式")
+    parser.add_argument("--output", "-output", default="../.starops-samples/logs", help="输出目录")
+    parser.add_argument("--simulate-error", "-simulate-error", dest="simulate_error", action="store_true", help="模拟网络断连，测试重试逻辑")
+    parser.add_argument("--mock", "-mock", action="store_true", help="Mock 模式：回放预录制的 SSE 事件文件")
+    parser.add_argument("--record", "-record", action="store_true", help="录制模式：旁路捕获 SSE 事件并写入文件")
+    parser.add_argument("--mock-input", "-mock-input", dest="mock_input", default="", help="Mock 交互输入：自动回复交互事件")
+    parser.add_argument("--mock-file", "-mock-file", dest="mock_file", default="", help="录制和回放的 SSE 事件文件路径")
     return parser.parse_args()
 
 
@@ -50,6 +55,19 @@ async def process_file(client: AgentClient, file_path: str, output_dir: str, sim
         # Create thread
         thread_id = client.create_thread()
 
+        # 捕获中断信号，发送 stop 请求
+        def _stop_handler():
+            print("\n⏹️  正在停止对话...")
+            try:
+                client.stop(thread_id)
+            except Exception as e:
+                sys.stderr.write(f"stop 请求失败: {e}\n")
+            os._exit(0)
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, _stop_handler)
+
         # Create output file
         output_file = create_output_file(file_path, output_dir)
 
@@ -69,6 +87,8 @@ async def process_file(client: AgentClient, file_path: str, output_dir: str, sim
         simple_printer = SimplePrinter() if simple_mode else None
         event_printer = None if simple_mode else EventPrinter(print_raw_body=False, print_parsed=True)
         interactive_handler = InteractiveHandler(client)
+        if client.config.mock_input:
+            interactive_handler.set_mock_input(client.config.mock_input)
         event_index = 0
 
         events = client.chat_with_variables(thread_id, message, variables)
@@ -190,6 +210,26 @@ async def main_async():
         if args.simulate_error:
             cfg.simulate_network_error = True
             print("⚠️  已启用网络断连模拟，将在收到首个事件后触发重试")
+        if args.mock:
+            cfg.mock_mode = True
+            if args.mock_file:
+                cfg.mock_file = args.mock_file
+            else:
+                cfg.mock_file = args.file_path + ".mock" if args.file_path else ""
+            cfg.mock_input = args.mock_input
+            print(f"🎭 Mock 模式，回放文件: {cfg.mock_file}")
+            if args.mock_input:
+                print(f"🤖 Mock 交互输入: {args.mock_input}")
+        if args.record:
+            cfg.record_mode = True
+            if args.mock_file:
+                cfg.mock_file = args.mock_file
+            else:
+                cfg.mock_file = args.file_path + ".mock" if args.file_path else ""
+            cfg.mock_input = args.mock_input
+            print(f"📝 录制模式，输出文件: {cfg.mock_file}")
+            if args.mock_input:
+                print(f"🤖 录制交互输入: {args.mock_input}")
 
         # Create client
         client = AgentClient(cfg)

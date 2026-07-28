@@ -15,6 +15,7 @@ class EventType(str, Enum):
     INTERACTIVE_RESPONSE = "interactive_response"
     TASK_FINISHED = "task_finished"
     CANCEL = "cancel"
+    STREAM_DONE = "stream_done"
 
 
 class MessageRole(str, Enum):

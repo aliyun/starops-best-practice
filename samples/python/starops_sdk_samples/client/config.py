@@ -21,10 +21,14 @@ class Config:
     endpoint: str
     access_key_id: str
     access_key_secret: str
-    region: str = "cn-hangzhou"
+    region: str = "cn-beijing"
     employee_name: str = "apsara-ops"
     retry_config: Optional[RetryConfig] = None  # 重试配置，None 时使用默认配置
     simulate_network_error: bool = False  # 模拟网络断连，用于测试重试逻辑
+    mock_mode: bool = False  # Mock 模式：回放预录制的 SSE 事件流
+    record_mode: bool = False  # 录制模式：旁路捕获 SSE 事件写入文件
+    mock_file: str = ""  # Mock/Record 文件路径
+    mock_input: str = ""  # Mock 交互输入：自动回复交互事件
 
     @classmethod
     def load_from_env(cls) -> "Config":
@@ -33,7 +37,7 @@ class Config:
 
         workspace = os.getenv("STAROPS_WORKSPACE", "")
         endpoint = os.getenv("STAROPS_ENDPOINT", "")
-        region = os.getenv("STAROPS_REGION", "cn-hangzhou")
+        region = os.getenv("STAROPS_REGION", "cn-beijing")
         access_key_id = os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID", "")
         access_key_secret = os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", "")
 
@@ -64,7 +68,7 @@ class Config:
             endpoint=endpoint,
             access_key_id=access_key_id,
             access_key_secret=access_key_secret,
-            region=region or "cn-hangzhou",
+            region=region or "cn-beijing",
             employee_name=employee_name or "apsara-ops",
             retry_config=load_retry_config_from_env(),
         )

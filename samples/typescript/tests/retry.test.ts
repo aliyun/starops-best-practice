@@ -10,7 +10,7 @@ import {
   calculateBackoff,
   defaultRetryConfig,
 } from '../src/client/retry.js';
-import type { ChatEvent } from '../src/client/agent-client.js';
+import type { ChatEvent } from '../src/types/events.js';
 
 function makeEvent(messages: Array<Record<string, unknown>>): ChatEvent {
   return {

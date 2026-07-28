@@ -113,13 +113,34 @@ func NewLogger(level LogLevel, output io.Writer) *Logger {
 }
 
 // NewLoggerFromEnv 从环境变量创建日志器
-// NewLoggerFromEnv creates a logger configured from the LOG_LEVEL environment variable
+// NewLoggerFromEnv creates a logger configured from the STAROPS_LOG_LEVEL environment variable
 // 支持的级别: debug, info, warn, error
 // Supported levels: debug, info, warn, error
+// 输出目标为 stderr，避免污染 stdout（stdout 可能是用户可见的最终结果）
+// Output goes to stderr so it doesn't pollute stdout, which may carry user-facing results.
 func NewLoggerFromEnv() *Logger {
-	levelStr := os.Getenv("LOG_LEVEL")
+	levelStr := os.Getenv("STAROPS_LOG_LEVEL")
 	level := ParseLogLevel(levelStr)
-	return NewLogger(level, os.Stdout)
+	return NewLogger(level, os.Stderr)
+}
+
+// defaultLogger 包级默认日志器（延迟初始化，由 Default() 通过 STAROPS_LOG_LEVEL 环境变量惰性构造）
+// defaultLogger is the package-level default logger, lazily initialized from STAROPS_LOG_LEVEL on first Default() call.
+var defaultLogger *Logger
+
+// Default 返回包级默认日志器，首次调用时按 STAROPS_LOG_LEVEL 环境变量初始化
+// Default returns the package-level default logger, lazily initialized from STAROPS_LOG_LEVEL on first access.
+func Default() *Logger {
+	if defaultLogger == nil {
+		defaultLogger = NewLoggerFromEnv()
+	}
+	return defaultLogger
+}
+
+// SetDefault 覆盖包级默认日志器（用于测试或宿主程序自定义日志目标 / 级别）
+// SetDefault overrides the package-level default logger, for tests or host programs that need custom sinks/levels.
+func SetDefault(l *Logger) {
+	defaultLogger = l
 }
 
 // SetLevel 设置日志级别
@@ -205,74 +226,7 @@ func (l *Logger) Error(msg string, err error, ctx map[string]any) {
 	l.log(LevelError, msg, ctx, err, true)
 }
 
-// ChatEvent 用于 LogResponse 的事件接口
-// ChatEvent interface for LogResponse
-type ChatEvent interface {
-	GetRawJSON() string
-	GetStatusCode() int32
-	IsDoneEvent() bool
-	GetError() error
-}
 
-// LogRequest 记录请求
-// LogRequest logs request parameters at debug level
-func (l *Logger) LogRequest(threadID, message string, variables map[string]any) {
-	ctx := map[string]any{
-		"threadId": threadID,
-		"message":  message,
-	}
-	if variables != nil {
-		ctx["variables"] = variables
-	}
-	l.Debug("发送请求 / Sending request", ctx)
-}
-
-// LogResponse 记录响应
-// LogResponse logs response summary at debug level
-func (l *Logger) LogResponse(threadID string, statusCode int32, rawJSON string, isDone bool, err error) {
-	ctx := map[string]any{
-		"threadId":   threadID,
-		"statusCode": statusCode,
-		"isDone":     isDone,
-	}
-
-	// 尝试解析 JSON 获取摘要信息
-	// Try to parse JSON for summary information
-	if rawJSON != "" {
-		var summary map[string]any
-		if jsonErr := json.Unmarshal([]byte(rawJSON), &summary); jsonErr == nil {
-			// 提取关键字段作为摘要
-			// Extract key fields as summary
-			if messages, ok := summary["messages"]; ok {
-				if msgArray, ok := messages.([]any); ok {
-					ctx["messageCount"] = len(msgArray)
-				}
-			}
-		}
-		// 限制 rawJSON 长度以避免日志过大
-		// Limit rawJSON length to avoid oversized logs
-		if len(rawJSON) > 500 {
-			ctx["rawJSON"] = rawJSON[:500] + "...(truncated)"
-		} else {
-			ctx["rawJSON"] = rawJSON
-		}
-	}
-
-	if err != nil {
-		l.Error("响应错误 / Response error", err, ctx)
-	} else {
-		l.Debug("收到响应 / Received response", ctx)
-	}
-}
-
-// LogResponseEvent 记录响应事件（便捷方法）
-// LogResponseEvent logs a response event (convenience method)
-func (l *Logger) LogResponseEvent(threadID string, event ChatEvent) {
-	if event == nil {
-		return
-	}
-	l.LogResponse(threadID, event.GetStatusCode(), event.GetRawJSON(), event.IsDoneEvent(), event.GetError())
-}
 
 // getStackTrace 获取堆栈跟踪
 // getStackTrace returns the stack trace

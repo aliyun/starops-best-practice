@@ -12,6 +12,7 @@ export enum EventType {
   INTERACTIVE_RESPONSE = 'interactive_response',
   TASK_FINISHED = 'task_finished',
   CANCEL = 'cancel',
+  STREAM_DONE = 'stream_done',
 }
 
 /** 消息角色 / Message role */

@@ -95,6 +95,9 @@ chat-interactive
 
 # 本地 Go 运行产物
 golang/chat-interactive
+golang/chat
+golang/chat-from-file
+*.json.mock
 golang/run-simple.sh
 golang/run.bat
 golang/run.sh
@@ -181,6 +184,9 @@ credentials.jsond
 .aone_copilot/
 .qoder/
 .kiro/
+.reasonix/
 
 # 本机文件
 docs/
+.docs/
+.starops-samples/

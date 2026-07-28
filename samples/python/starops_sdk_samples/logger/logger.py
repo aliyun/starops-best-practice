@@ -38,12 +38,13 @@ class Logger:
 
     def __init__(self, level: LogLevel = LogLevel.INFO, output: Optional[TextIO] = None):
         self.level = level
-        self.output = output or sys.stdout
+        # 默认输出到 stderr，避免日志污染 stdout（stdout 可能承载用户可见的最终结果）
+        self.output = output or sys.stderr
 
     @classmethod
     def from_env(cls) -> "Logger":
         """从环境变量创建日志器 / Create logger from environment variables"""
-        level_str = os.getenv("LOG_LEVEL")
+        level_str = os.getenv("STAROPS_LOG_LEVEL")
         level = LogLevel.from_string(level_str)
         return cls(level=level)
 
@@ -104,42 +105,3 @@ class Logger:
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
         self._log(LogLevel.ERROR, message, context, error, include_stack=True)
-
-    def log_request(
-        self,
-        thread_id: str,
-        message: str,
-        variables: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        context: Dict[str, Any] = {
-            "threadId": thread_id,
-            "message": message,
-        }
-        if variables:
-            context["variables"] = variables
-        self.debug("发送请求 / Sending request", context)
-
-    def log_response(
-        self,
-        thread_id: str,
-        status_code: int,
-        raw_json: str,
-        is_done: bool,
-        error: Optional[Exception] = None,
-    ) -> None:
-        context: Dict[str, Any] = {
-            "threadId": thread_id,
-            "statusCode": status_code,
-            "isDone": is_done,
-        }
-
-        if raw_json:
-            if len(raw_json) > 500:
-                context["rawJSON"] = raw_json[:500] + "...(truncated)"
-            else:
-                context["rawJSON"] = raw_json
-
-        if error:
-            self.error("响应错误 / Response error", error, context)
-        else:
-            self.debug("收到响应 / Received response", context)

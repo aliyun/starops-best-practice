@@ -1,5 +1,5 @@
 """ChatEvent 测试"""
-from starops_sdk_samples.client.agent_client import ChatEvent
+from starops_sdk_samples.types.events import ChatEvent
 
 
 class TestChatEvent:

@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isDoneMessage } from '../src/client/agent-client.js';
+import { isDoneMessage } from '../src/types/events.js';
 
 describe('isDoneMessage', () => {
   it('event 字段为 done 时返回 true', () => {

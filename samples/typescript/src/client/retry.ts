@@ -1,8 +1,10 @@
 /**
- * SSE retry logic for STAROps SDK
- * STAROps SDK SSE 重试逻辑
+ * retry.ts — SSE 流重连与指数退避
+ * 职责：管理 SSE 连接生命周期，断线后自动重连、指数退避、消息去重、空闲超时检测。
+ * 不做：不解析事件内容(→ChatEvent)、不做输出(→event-printer.ts)、不处理交互。
+ * 依赖：starops SDK (CreateChat API)、errors.ts
  *
- * 跨语言对齐 Go 参考实现（samples/golang/internal/client/retry.go）：
+ * 跨语言对齐 Go 参考实现（samples/golang/pkg/client/retry.go）：
  * - 重试触发：所有非 stream_done 的中断均触发重连
  * - 唯一结束：stream_done 是正常结束的唯一标志
  * - 不区分错误：不判断错误类型，一律重试
@@ -10,7 +12,7 @@
  */
 
 import * as $Starops20260428 from '@alicloud/starops20260428';
-import type { ChatEvent } from './agent-client.js';
+import type { ChatEvent } from '../types/events.js';
 
 // ===================== 一、配置 =====================
 

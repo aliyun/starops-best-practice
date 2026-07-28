@@ -18,7 +18,9 @@ public enum EventType {
     /** 任务完成事件 / Task finished event */
     TASK_FINISHED("task_finished"),
     /** 取消事件 / Cancel event */
-    CANCEL("cancel");
+    CANCEL("cancel"),
+    /** 流式结束事件 / Stream done event */
+    STREAM_DONE("stream_done");
 
     private final String value;
 

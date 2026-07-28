@@ -1,5 +1,6 @@
 package com.alibaba.cloud.starops.samples.client;
 
+import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;

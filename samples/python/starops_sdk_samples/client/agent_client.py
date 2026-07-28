@@ -1,13 +1,15 @@
 """
-Agent client for STAROps SDK
-STAROps SDK Agent 客户端
+agent_client.py — 主客户端入口
+职责：初始化 SDK 客户端、加载配置(.env)、发起对话请求、分发 SSE 事件流。
+不做：不处理重连(→retry.py)、不处理交互(→interactive_handler.py)、不做输出格式化(→event_printer.py)。
+依赖：starops SDK、credentials.py、retry.py
 """
 
 import asyncio
 import json
 import sys
+import threading
 import time
-from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from alibabacloud_starops20260428.client import Client
@@ -15,6 +17,7 @@ from alibabacloud_starops20260428 import models as starops_models
 from alibabacloud_tea_openapi import models as openapi_models
 from alibabacloud_tea_util import models as util_models
 
+from ..types.events import ChatEvent, ThreadInfo, ThreadMessage
 from .config import Config
 from .errors import SDKException, ErrorCode
 from .retry import (
@@ -28,72 +31,8 @@ from .retry import (
     build_reconnect_request,
 )
 
-
-@dataclass
-class ChatEvent:
-    """聊天事件 / Chat event"""
-    body: Optional[Dict[str, Any]] = None
-    raw_json: str = ""
-    status_code: int = 0
-    is_done: bool = False
-    error: Optional[Exception] = None
-    id: Optional[str] = None
-    event: Optional[str] = None
-
-    @classmethod
-    def done(cls) -> "ChatEvent":
-        return cls(is_done=True)
-
-    @classmethod
-    def from_error(cls, error: Exception) -> "ChatEvent":
-        return cls(error=error)
-
-    @classmethod
-    def from_response(cls, body: Dict[str, Any], raw_json: str, status_code: int) -> "ChatEvent":
-        is_done = cls._is_done_message(body)
-        return cls(
-            body=body,
-            raw_json=raw_json,
-            status_code=status_code,
-            is_done=is_done,
-            id=body.get("id") if body else None,
-            event=body.get("event") if body else None,
-        )
-
-    @staticmethod
-    def _is_done_message(body: Optional[Dict[str, Any]]) -> bool:
-        if not body:
-            return False
-        # 优先使用 response 级别的 event 字段
-        if body.get("event") == "done":
-            return True
-        # fallback: 遍历 messages
-        messages = body.get("messages", [])
-        for msg in messages:
-            if isinstance(msg, dict) and msg.get("type") == "done":
-                return True
-        return False
-
-    def has_error(self) -> bool:
-        return self.error is not None
-
-
-@dataclass
-class ThreadInfo:
-    """会话信息 / Thread information"""
-    thread_id: str
-    title: str = ""
-    status: str = ""
-    create_time: str = ""
-    update_time: str = ""
-
-
-@dataclass
-class ThreadMessage:
-    """会话消息 / Thread message"""
-    role: str
-    content: str
-    timestamp: str = ""
+DEFAULT_LANGUAGE = "zh"
+DEFAULT_TIMEZONE = "Asia/Shanghai"
 
 
 class AgentClient:
@@ -114,6 +53,8 @@ class AgentClient:
 
     def create_thread(self) -> str:
         """创建会话 / Create thread"""
+        if self.config.mock_mode:
+            return "mock-thread-001"
         try:
             variables = starops_models.CreateThreadRequestVariables(
                 workspace=self.config.workspace
@@ -133,14 +74,41 @@ class AgentClient:
         except Exception as e:
             raise SDKException.thread_create(e)
 
+    def stop(self, thread_id: str, variables: Optional[Dict[str, Any]] = None) -> None:
+        """发送停止请求，中断正在进行的对话（同步调用，带超时）/ Send stop request"""
+        if self.config.mock_mode:
+            return
+        if variables is None:
+            variables = {}
+        variables.setdefault("workspace", self.config.workspace)
+        variables.setdefault("region", self.config.region)
+        variables.setdefault("language", DEFAULT_LANGUAGE)
+        variables.setdefault("timeZone", DEFAULT_TIMEZONE)
+        now = int(time.time())
+        variables.setdefault("timeStamp", str(now))
+        variables.setdefault("startTime", str(now - 15 * 60))
+        variables.setdefault("endTime", str(now))
+
+        request = starops_models.CreateChatRequest(
+            action="stop",
+            thread_id=thread_id,
+            digital_employee_name=self.config.employee_name,
+            variables=variables,
+        )
+        runtime = util_models.RuntimeOptions(read_timeout=5000, connect_timeout=3000)
+        try:
+            self._client.create_chat_with_options(request, {}, runtime)
+        except Exception as e:
+            sys.stderr.write(f"stop 请求失败: {e}\n")
+
     async def chat(self, thread_id: str, message: str) -> AsyncIterator[ChatEvent]:
         """开始 SSE 对话 / Start SSE chat"""
         now = int(time.time())
         variables = {
             "workspace": self.config.workspace,
             "region": self.config.region,
-            "language": "zh",
-            "timeZone": "Asia/Shanghai",
+            "language": DEFAULT_LANGUAGE,
+            "timeZone": DEFAULT_TIMEZONE,
             "timeStamp": str(now),
             "startTime": str(now - 15 * 60),
             "endTime": str(now),
@@ -169,8 +137,8 @@ class AgentClient:
                 variables = {}
             variables.setdefault("workspace", self.config.workspace)
             variables.setdefault("region", self.config.region)
-            variables.setdefault("language", "zh")
-            variables.setdefault("timeZone", "Asia/Shanghai")
+            variables.setdefault("language", DEFAULT_LANGUAGE)
+            variables.setdefault("timeZone", DEFAULT_TIMEZONE)
             now = int(time.time())
             variables.setdefault("timeStamp", str(now))
             variables.setdefault("startTime", str(now - 15 * 60))
@@ -183,6 +151,22 @@ class AgentClient:
                 messages=[msg],
                 variables=variables,
             )
+
+            # Mock/Record 模式：直接拦截
+            if self.config.mock_mode or self.config.record_mode:
+                from .mock import open_sse_stream
+                async def real_stream():
+                    runtime = util_models.RuntimeOptions(read_timeout=300000, connect_timeout=30000)
+                    response_iter = self._client.create_chat_with_sse(request, {}, runtime)
+                    for resp in response_iter:
+                        yield {"id": resp.id or "", "event": resp.event or "", "body": resp.body, "statusCode": 200}
+                async for raw in open_sse_stream(self.config, request, real_stream):
+                    body = raw.get("body")
+                    yield ChatEvent(
+                        body=body, raw_json=json.dumps(body) if body else "",
+                        status_code=raw.get("statusCode", 200), is_done=False, error=None,
+                    )
+                return
 
             # 使用带重试能力的 SSE 流处理 / Use SSE streaming with retry
             config = load_retry_config_from_env()
@@ -247,9 +231,11 @@ class AgentClient:
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
         start_time = time.time()
+        stop_event = threading.Event()  # 线程安全停止标志：消费方置位后生产者尽快退出
 
         def _producer() -> None:
             """在线程中消费同步 SSE 迭代器，结果投递到 asyncio 队列"""
+            response_iterator = None
             try:
                 runtime = util_models.RuntimeOptions()
                 runtime.connect_timeout = 30000
@@ -258,12 +244,21 @@ class AgentClient:
                     request, {}, runtime
                 )
                 for response in response_iterator:
+                    if stop_event.is_set():
+                        break
                     loop.call_soon_threadsafe(
                         queue.put_nowait, ("response", response)
                     )
                 loop.call_soon_threadsafe(queue.put_nowait, ("closed", None))
             except Exception as exc:  # noqa: BLE001 - 一律视为连接中断
                 loop.call_soon_threadsafe(queue.put_nowait, ("error", exc))
+            finally:
+                # 主动关闭响应迭代器，避免底层 HTTP 连接泄漏
+                if response_iterator is not None and hasattr(response_iterator, "close"):
+                    try:
+                        response_iterator.close()
+                    except Exception:  # noqa: BLE001 - 关闭失败不影响主流程
+                        pass
 
         producer = loop.run_in_executor(None, _producer)
 
@@ -274,6 +269,7 @@ class AgentClient:
                         queue.get(), timeout=config.idle_timeout
                     )
                 except asyncio.TimeoutError:
+                    stop_event.set()
                     print("连接中断，中断原因：空闲超时，未收到消息")
                     yield (ConnectionOutcome.INTERRUPTED, None)
                     return
@@ -289,6 +285,7 @@ class AgentClient:
                     if payload is None:
                         continue
                     # 非 stream_done 的任何错误都视为连接中断，触发重连
+                    stop_event.set()
                     print(f"SSE 连接错误: {payload}，准备重连...", file=sys.stderr)
                     print("连接中断，中断原因：SSE连接错误")
                     yield (ConnectionOutcome.INTERRUPTED, None)
@@ -319,7 +316,8 @@ class AgentClient:
                         yield (ConnectionOutcome.INTERRUPTED, None)
                         return
         finally:
-            # 取消后台生产者，避免线程/连接泄漏
+            # 置位停止标志并取消后台生产者，避免线程/连接泄漏
+            stop_event.set()
             producer.cancel()
 
     def _forward_event(self, event: ChatEvent, state: RetryState) -> bool:
@@ -365,8 +363,8 @@ class AgentClient:
             variables["userInteractive"] = user_interactive
             variables.setdefault("workspace", self.config.workspace)
             variables.setdefault("region", self.config.region)
-            variables.setdefault("language", "zh")
-            variables.setdefault("timeZone", "Asia/Shanghai")
+            variables.setdefault("language", DEFAULT_LANGUAGE)
+            variables.setdefault("timeZone", DEFAULT_TIMEZONE)
             variables.setdefault("timeStamp", str(int(time.time())))
 
             request = starops_models.CreateChatRequest(
@@ -375,6 +373,24 @@ class AgentClient:
                 digital_employee_name=self.config.employee_name,
                 variables=variables,
             )
+
+            # Mock/Record 模式
+            if self.config.mock_mode or self.config.record_mode:
+                from .mock import open_sse_stream
+                async def real_stream():
+                    runtime = util_models.RuntimeOptions()
+                    runtime.connect_timeout = 30000
+                    runtime.read_timeout = 300000
+                    response_iter = await self._client.create_chat_with_sse(request, {}, runtime)
+                    for resp in response_iter:
+                        yield {"id": resp.id or "", "event": resp.event or "", "body": resp.body, "statusCode": 200}
+                async for raw in open_sse_stream(self.config, request, real_stream):
+                    body = raw.get("body")
+                    yield ChatEvent(
+                        body=body, raw_json=json.dumps(body) if body else "",
+                        status_code=raw.get("statusCode", 200), is_done=False, error=None,
+                    )
+                return
 
             runtime = util_models.RuntimeOptions()
             runtime.connect_timeout = 30000

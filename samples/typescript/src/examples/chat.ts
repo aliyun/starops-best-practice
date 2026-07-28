@@ -60,6 +60,22 @@ async function main() {
     const threadId = await client.createThread();
     console.log(`✅ ThreadID: ${threadId}\n`);
 
+    // 捕获中断信号，发送 stop 请求
+    const stopWithTimeout = async () => {
+      console.log('\n⏹️  正在停止对话...');
+      try {
+        await Promise.race([
+          client.stop(threadId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
+        ]);
+      } catch (e) {
+        console.error(`⚠️  stop 请求超时或失败: ${(e as Error).message}`);
+      }
+      process.exit(0);
+    };
+    process.on('SIGINT', stopWithTimeout);
+    process.on('SIGTERM', stopWithTimeout);
+
     // Create printer
     const printer = new SimplePrinter();
     const interactiveHandler = new InteractiveHandler(client);
