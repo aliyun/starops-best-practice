@@ -41,6 +41,8 @@ import com.aliyun.sdk.service.starops20260428.models.GetThreadResponseBody;
 import com.aliyun.sdk.service.starops20260428.models.ListThreadsRequest;
 import com.aliyun.sdk.service.starops20260428.models.ListThreadsResponse;
 import com.aliyun.sdk.service.starops20260428.models.ListThreadsResponseBody;
+import com.aliyun.sdk.service.starops20260428.models.UpdateThreadRequest;
+import com.aliyun.sdk.service.starops20260428.models.UpdateThreadResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -696,6 +698,31 @@ public class AgentClient implements ChatClient, AutoCloseable {
                 throw SDKException.threadNotFound(threadId);
             }
             throw new SDKException(ErrorCode.API_ERROR, "获取会话详情失败: " + threadId, e)
+                    .withContext("threadId", threadId)
+                    .withSuggestion("请检查会话 ID 是否正确");
+        }
+    }
+
+    /**
+     * 更新会话属性（如模型配置）
+     * Update thread attributes (e.g. model config)
+     */
+    public void updateThread(String threadId, Map<String, String> attributes) throws SDKException {
+        validateThreadId(threadId);
+        if (config.isMockMode()) return;
+
+        try {
+            UpdateThreadRequest.Builder builder = UpdateThreadRequest.builder()
+                    .name(config.getEmployeeName())
+                    .threadId(threadId);
+
+            if (attributes != null && !attributes.isEmpty()) {
+                builder.attributes(attributes);
+            }
+
+            client.updateThread(builder.build()).get();
+        } catch (Exception e) {
+            throw new SDKException(ErrorCode.API_ERROR, "更新会话失败: " + threadId, e)
                     .withContext("threadId", threadId)
                     .withSuggestion("请检查会话 ID 是否正确");
         }

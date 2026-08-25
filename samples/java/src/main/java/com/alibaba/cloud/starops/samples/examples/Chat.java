@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.BlockingQueue;
 
 import com.alibaba.cloud.starops.samples.client.AgentClient;
+import com.alibaba.cloud.starops.samples.client.ModelsConfig;
 import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.alibaba.cloud.starops.samples.client.Config;
 import com.alibaba.cloud.starops.samples.client.InteractiveHandler;
@@ -29,10 +30,40 @@ public class Chat {
         System.out.println("=".repeat(60));
 
         boolean simulateError = false;
-        for (String arg : args) {
-            if ("-simulate-error".equals(arg)) {
-                simulateError = true;
+        String modelFlag = null;
+        boolean listModels = false;
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "-simulate-error":
+                case "--simulate-error":
+                    simulateError = true;
+                    break;
+                case "--model":
+                    if (i + 1 < args.length) {
+                        modelFlag = args[++i];
+                    }
+                    break;
+                case "--list-models":
+                    listModels = true;
+                    break;
+                default:
+                    if (args[i].startsWith("--model=")) {
+                        modelFlag = args[i].substring("--model=".length());
+                    }
+                    break;
             }
+        }
+
+        // 加载模型配置（不依赖凭据）
+        ModelsConfig modelsCfg = ModelsConfig.loadModels(ModelsConfig.findConfigPath());
+
+        if (listModels) {
+            if (modelsCfg == null) {
+                System.out.println("⚠️  模型配置未加载");
+            } else {
+                System.out.println(ModelsConfig.listModelFlags(modelsCfg));
+            }
+            return;
         }
 
         try {
@@ -50,7 +81,24 @@ public class Chat {
 
             // Create thread
             System.out.println("📝 创建会话...");
-            String threadId = client.createThread();
+            Map<String, String> threadAttrs = null;
+            if (modelFlag != null) {
+                String[] parsed = ModelsConfig.parseModelFlag(modelFlag);
+                if (parsed == null) {
+                    System.out.printf("❌ 解析 --model 失败: 格式应为 provider:modelId，实际: %s%n", modelFlag);
+                    System.exit(1);
+                }
+                String provider = parsed[0];
+                String modelId = parsed[1];
+                if (modelsCfg != null && !ModelsConfig.validateModel(modelsCfg, provider, modelId)) {
+                    System.out.printf("❌ 未知模型: %s:%s，可用 --list-models 查看可选值%n", provider, modelId);
+                    System.exit(1);
+                }
+                threadAttrs = new HashMap<>();
+                threadAttrs.put("model", ModelsConfig.buildModelJson(provider, modelId));
+                System.out.printf("🤖 已指定模型: %s:%s%n", provider, modelId);
+            }
+            String threadId = client.createThread(threadAttrs);
             System.out.printf("✅ ThreadID: %s%n%n", threadId);
 
             // 捕获中断信号，发送 stop 请求
@@ -80,25 +128,59 @@ public class Chat {
                 }
 
                 input = input.trim();
-                if (input.isEmpty()) {
-                    continue;
+                switch (input) {
+                    case "":
+                        continue;
+                    case "quit":
+                    case "exit":
+                        System.out.println("👋 再见!");
+                        finished.set(true);
+                        client.shutdown();
+                        return;
+                    case "/model":
+                        if (modelsCfg == null) {
+                            System.out.println("⚠️  模型配置未加载");
+                            continue;
+                        }
+                        System.out.println(ModelsConfig.displayMenu(modelsCfg));
+                        System.out.print("请输入序号选择模型: ");
+                        String choice = reader.readLine();
+                        if (choice == null) continue;
+                        int idx;
+                        try {
+                            idx = Integer.parseInt(choice.trim());
+                        } catch (NumberFormatException e) {
+                            System.out.println("❌ 无效输入");
+                            continue;
+                        }
+                        String[] modelInfo = ModelsConfig.getModelByIndex(modelsCfg, idx - 1);
+                        if (modelInfo == null) {
+                            System.out.printf("❌ model index %d out of range%n", idx);
+                            continue;
+                        }
+                        try {
+                            Map<String, String> attrs = new HashMap<>();
+                            attrs.put("model", ModelsConfig.buildModelJson(modelInfo[0], modelInfo[1]));
+                            client.updateThread(threadId, attrs);
+                            System.out.println("✅ 更新模型成功");
+                        } catch (SDKException e) {
+                            System.out.printf("❌ 更新失败: %s%n", e.getMessage());
+                        }
+                        continue;
+                    default:
+                        System.out.println("-".repeat(60));
+
+                        // Send message
+                        printer.reset();
+                        BlockingQueue<ChatEvent> events = client.chat(threadId, input);
+
+                        processChatEvents(events, printer, interactiveHandler, threadId);
+
+                        System.out.println();
+                        System.out.println("=".repeat(60));
+                        System.out.println();
+                        break;
                 }
-                if (input.equals("quit") || input.equals("exit")) {
-                    System.out.println("👋 再见!");
-                    break;
-                }
-
-                System.out.println("-".repeat(60));
-
-                // Send message
-                printer.reset();
-                BlockingQueue<ChatEvent> events = client.chat(threadId, input);
-
-                processChatEvents(events, printer, interactiveHandler, threadId);
-
-                System.out.println();
-                System.out.println("=".repeat(60));
-                System.out.println();
             }
 
             // 标记正常退出，shutdown hook 跳过 stop

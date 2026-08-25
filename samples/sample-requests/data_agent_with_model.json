@@ -1,0 +1,17 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "contents": [
+        {
+          "type": "text",
+          "value": "查询最近1小时的告警数量"
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "userContext": "[{\"type\":\"metadata\",\"data\":{\"fromTime\":1770685976,\"toTime\":1770686876}}]",
+    "config": "{\"model\":{\"provider\":\"qwen\",\"modelID\":\"qwen3.8-max\"},\"disableThreadData\":false}"
+  }
+}

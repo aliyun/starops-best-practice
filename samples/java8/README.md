@@ -114,6 +114,8 @@ export ALIBABA_CLOUD_ACCESS_KEY_SECRET=<your-access-key-secret>
 
 | Flag | Applies to | Description |
 |------|-----------|-------------|
+| `--model provider:modelId` | `Chat` | Specify a model when creating a session (e.g. `--model qwen:qwen3.8-max`) |
+| `--list-models` | `Chat` | List all available model values and exit (no credentials required) |
 | `-simulate-error` | `Chat`, `ChatFromFile` | Simulate a network disconnection to exercise retries |
 | `-file <path>` | `ChatFromFile` | Load a single request from a JSON file |
 | `-dir <path>` | `ChatFromFile` | Batch-process every JSON request in a directory |

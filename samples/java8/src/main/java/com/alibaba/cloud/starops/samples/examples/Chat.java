@@ -8,6 +8,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.alibaba.cloud.starops.samples.client.AgentClient;
+import com.alibaba.cloud.starops.samples.client.ModelsConfig;
 import com.alibaba.cloud.starops.samples.types.ChatEvent;
 import com.alibaba.cloud.starops.samples.client.Config;
 import com.alibaba.cloud.starops.samples.client.InteractiveHandler;
@@ -29,10 +30,33 @@ public class Chat {
         System.out.println(repeatStr("=", 60));
 
         boolean simulateError = false;
-        for (String arg : args) {
+        String modelFlag = null;
+        boolean listModels = false;
+
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
             if ("-simulate-error".equals(arg)) {
                 simulateError = true;
+            } else if ("--model".equals(arg) && i + 1 < args.length) {
+                modelFlag = args[++i];
+            } else if (arg.startsWith("--model=")) {
+                modelFlag = arg.substring("--model=".length());
+            } else if ("--list-models".equals(arg)) {
+                listModels = true;
             }
+        }
+
+        // 加载模型配置（不依赖凭据）
+        ModelsConfig modelsCfg = ModelsConfig.loadModels(ModelsConfig.findConfigPath());
+
+        // --list-models: 短路，打印后退出（不需要凭据）
+        if (listModels) {
+            if (modelsCfg == null) {
+                System.out.println("⚠️  模型配置未加载");
+            } else {
+                System.out.println(ModelsConfig.listModelFlags(modelsCfg));
+            }
+            return;
         }
 
         try {
@@ -48,9 +72,25 @@ public class Chat {
             // Create client
             AgentClient client = new AgentClient(cfg);
 
+            // 解析 --model 参数
+            Map<String, String> threadAttrs = null;
+            if (modelFlag != null && !modelFlag.isEmpty()) {
+                String[] parsed = ModelsConfig.parseModelFlag(modelFlag);
+                String provider = parsed[0];
+                String modelId = parsed[1];
+                if (modelsCfg != null && !ModelsConfig.validateModel(modelsCfg, provider, modelId)) {
+                    System.out.printf("❌ 未知模型: %s:%s，可用 --list-models 查看可选值%n", provider, modelId);
+                    System.exit(1);
+                    return;
+                }
+                threadAttrs = new HashMap<String, String>();
+                threadAttrs.put("model", ModelsConfig.buildModelJson(provider, modelId));
+                System.out.printf("🤖 已指定模型: %s:%s%n", provider, modelId);
+            }
+
             // Create thread
             System.out.println("📝 创建会话...");
-            String threadId = client.createThread();
+            String threadId = client.createThread(threadAttrs);
             System.out.printf("✅ ThreadID: %s%n%n", threadId);
 
             // 捕获中断信号，发送 stop 请求
@@ -83,12 +123,43 @@ public class Chat {
                 }
 
                 input = input.trim();
-                if (input.isEmpty()) {
-                    continue;
-                }
-                if (input.equals("quit") || input.equals("exit")) {
-                    System.out.println("👋 再见!");
-                    break;
+                switch (input) {
+                    case "":
+                        continue;
+                    case "quit":
+                    case "exit":
+                        System.out.println("👋 再见!");
+                        finished.set(true);
+                        client.shutdown();
+                        return;
+                    case "/model":
+                        if (modelsCfg == null) {
+                            System.out.println("⚠️  模型配置未加载");
+                            continue;
+                        }
+                        System.out.println(ModelsConfig.displayMenu(modelsCfg));
+                        System.out.print("请输入序号选择模型: ");
+                        String choice = reader.readLine();
+                        if (choice == null) {
+                            continue;
+                        }
+                        try {
+                            int idx = Integer.parseInt(choice.trim());
+                            String[] selected = ModelsConfig.getModelByIndex(modelsCfg, idx - 1);
+                            Map<String, String> attrs = new HashMap<String, String>();
+                            attrs.put("model", ModelsConfig.buildModelJson(selected[0], selected[1]));
+                            client.updateThread(threadId, attrs);
+                            System.out.println("✅ 更新模型成功");
+                        } catch (NumberFormatException e) {
+                            System.out.println("❌ 无效输入");
+                        } catch (IllegalArgumentException e) {
+                            System.out.println("❌ " + e.getMessage());
+                        } catch (SDKException e) {
+                            System.out.printf("❌ 更新失败: %s%n", e.getMessage());
+                        }
+                        continue;
+                    default:
+                        break;
                 }
 
                 System.out.println(repeatStr("-", 60));

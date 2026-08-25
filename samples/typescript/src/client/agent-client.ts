@@ -533,6 +533,26 @@ export class AgentClient {
     return '';
   }
 
+  /** 更新会话属性（如模型配置） / Update thread attributes */
+  async updateThread(threadId: string, attributes: Record<string, string>): Promise<void> {
+    this.validateThreadId(threadId);
+    try {
+      const request = new $Starops20260428.UpdateThreadRequest({
+        attributes,
+      });
+      await this.client.updateThread(
+        this.config.employeeName,
+        threadId,
+        request
+      );
+    } catch (e) {
+      if (e instanceof SDKException) throw e;
+      throw new SDKException(ErrorCode.API_ERROR, `更新会话失败: ${threadId}`, e as Error)
+        .withContext('threadId', threadId)
+        .withSuggestion('请检查会话 ID 和属性是否正确');
+    }
+  }
+
   // ===================== SSE 重试编排 =====================
 
   /**

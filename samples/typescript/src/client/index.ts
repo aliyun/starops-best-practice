@@ -9,3 +9,4 @@ export * from './agent-client.js';
 export * from './simple-printer.js';
 export * from './event-printer.js';
 export * from './interactive-handler.js';
+export * from './models.js';

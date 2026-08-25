@@ -25,6 +25,7 @@
 - **Mock 回放**：通过 `--mock-file` 离线回放录制的 SSE 会话，无需凭据和网络，便于演示与测试。
 - **凭据配置**：推荐使用阿里云 CLI 配置权限；不想安装 CLI 时可使用环境变量配置 AK/SK。
 - **共享请求样例**：所有语言复用同一组 JSON 请求文件。
+- **模型选择**：启动时通过 `--model` 指定模型，或在对话中输入 `/model` 交互式切换。
 - **一致示例程序**：每种语言都提供交互式对话、文件请求。
 
 > [!IMPORTANT]
@@ -35,6 +36,7 @@
 ```text
 .
 ├── README.md / README_zh.md
+├── config/                           # 共享模型配置
 ├── sample-requests/              # 共享 STAROps 请求样例（[说明文档](sample-requests/README.md)）
 ├── golang/                        # Go 1.22+ 示例客户端
 ├── java/                          # Java 11+ 示例客户端
@@ -127,6 +129,7 @@ cd java && mvn exec:java \
 | `sls_chat.json` | SLS 相关对话 |
 | `user_ack_interactive.json` | 用户确认类交互 |
 | `user_input_interactive.json` | 用户输入类交互 |
+| `data_agent_with_model.json` | 指定模型的数据 Agent 分析 |
 | `request_with_reminder.json` | 完整请求体示例（含 metadata + dynamic 上下文） |
 
 ## 示例程序
@@ -137,6 +140,60 @@ cd java && mvn exec:java \
 | --- | --- |
 | `chat` | 启动交互式多轮对话 |
 | `chat-from-file` | 加载单个 JSON 请求或批量处理请求目录 |
+
+## 模型选择
+
+支持在创建对话时指定模型，以及在对话过程中动态切换模型。
+所有语言共享 `config/models.json` 作为模型定义的唯一数据源。
+
+### 共享配置
+
+| 项目 | 说明 |
+| --- | --- |
+| 配置文件 | `config/models.json` —— 所有语言的统一模型注册表 |
+| 覆盖路径 | 设置环境变量 `STAROPS_MODELS_CONFIG` 可使用自定义路径 |
+
+### CLI 参数
+
+| 参数 | 说明 |
+| --- | --- |
+| `--model provider:modelId` | 创建会话时指定模型（如 `--model qwen:qwen3.8-max`） |
+| `--list-models` | 列出所有可用模型取值后退出（不需要凭据） |
+
+### 交互命令
+
+在对话中输入 `/model` 可交互式切换模型。
+客户端显示菜单，选择序号后调用 `UpdateThread` 生效。
+
+### 各语言示例
+
+```bash
+# Go
+cd golang && go run ./cmd/chat/ --model qwen:qwen3.8-max
+
+# Python
+cd python && python -m starops_sdk_samples.examples.chat --model qwen:qwen3.8-max
+
+# TypeScript
+cd typescript && npm run chat -- --model qwen:qwen3.8-max
+
+# Java / Java 8
+cd java && mvn exec:java \
+  -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.Chat" \
+  -Dexec.args="--model qwen:qwen3.8-max"
+```
+
+### 优先级
+
+模型选择优先级（从高到低）：
+
+1. `CreateChat` 请求中的 `variables.config.model`
+2. Thread `attributes.model`（通过 `UpdateThread` / `/model` 命令设置）
+3. Agent 默认配置
+
+### 从文件发起带模型的对话
+
+参考 [`sample-requests/data_agent_with_model.json`](sample-requests/data_agent_with_model.json)，通过 `variables.config` 传递模型配置。
 
 ## 重试与重连模型
 
