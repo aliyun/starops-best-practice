@@ -110,6 +110,8 @@ export ALIBABA_CLOUD_ACCESS_KEY_SECRET=<your-access-key-secret>
 
 | 参数 | 适用命令 | 说明 |
 |------|----------|------|
+| `--model provider:modelId` | `chat` | 创建会话时指定模型（如 `--model qwen:qwen3.8-max`） |
+| `--list-models` | `chat` | 列出所有可用模型取值后退出（不需要凭据） |
 | `-simulate-error` | `chat`、`chat_from_file` | 模拟网络断连，用于验证重试 |
 | `-file <path>` | `chat_from_file` | 从单个 JSON 文件加载请求 |
 | `-dir <path>` | `chat_from_file` | 批量处理目录下的所有 JSON 请求 |

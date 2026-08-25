@@ -1,0 +1,29 @@
+{
+    "providers": [
+        {
+            "provider": "qwen",
+            "displayName": "Qwen",
+            "models": [
+                {"modelId": "qwen3.8-max", "displayName": "Qwen 3.8-Max", "shortName": "3.8-Max"},
+                {"modelId": "qwen3.7-max", "displayName": "Qwen 3.7-Max", "shortName": "3.7-Max"},
+                {"modelId": "qwen3.7-plus", "displayName": "Qwen 3.7-Plus", "shortName": "3.7-Plus"},
+                {"modelId": "qwen3.7-flash", "displayName": "Qwen 3.7-Flash", "shortName": "3.7-Flash"}
+            ]
+        },
+        {
+            "provider": "glm",
+            "displayName": "GLM",
+            "models": [
+                {"modelId": "glm-5.2", "displayName": "GLM 5.2", "shortName": "5.2"}
+            ]
+        },
+        {
+            "provider": "deepseek",
+            "displayName": "DeepSeek",
+            "models": [
+                {"modelId": "deepseek-v4-pro", "displayName": "DeepSeek V4-Pro", "shortName": "V4-Pro"},
+                {"modelId": "deepseek-v4-flash", "displayName": "DeepSeek V4-Flash", "shortName": "V4-Flash"}
+            ]
+        }
+    ]
+}

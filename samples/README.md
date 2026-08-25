@@ -25,6 +25,7 @@ stream responses over SSE, handle interactive events, and recover from transient
 - **Mock playback**: Replay recorded SSE sessions offline via `--mock-file` (no credentials or network needed), useful for demos and tests.
 - **Credential configuration**: Prefer Alibaba Cloud CLI-based credential configuration; environment variables can be used when CLI installation is not desired.
 - **Shared request fixtures**: Reuse the same JSON request files across languages.
+- **Model selection**: Specify a model at session start (`--model`) or switch interactively (`/model`) during a conversation.
 - **Consistent examples**: Run interactive chat, file-based chat, and thread management in every language.
 
 > [!IMPORTANT]
@@ -35,6 +36,7 @@ stream responses over SSE, handle interactive events, and recover from transient
 ```text
 .
 ├── README.md / README_zh.md
+├── config/                           # Shared model configuration
 ├── sample-requests/              # Shared STAROps request examples ([docs](sample-requests/README.md))
 ├── golang/                        # Go 1.22+ sample client
 ├── java/                          # Java 11+ sample client
@@ -131,6 +133,7 @@ The [`sample-requests/`](sample-requests/) directory contains request fixtures t
 | `sls_chat.json` | SLS-focused chat |
 | `user_ack_interactive.json` | User acknowledgement interaction |
 | `user_input_interactive.json` | User input interaction |
+| `data_agent_with_model.json` | Data-agent analysis with model selection |
 | `request_with_reminder.json` | Complete request body with metadata + dynamic context |
 
 ## Example programs
@@ -141,6 +144,60 @@ Each language provides the same two entry points:
 | --- | --- |
 | `chat` | Start an interactive multi-turn conversation |
 | `chat-from-file` | Load one JSON request or process a directory of requests |
+
+## Model selection
+
+Support specifying a model when creating a conversation and dynamically switching models during a conversation.
+All languages share a single model registry at `config/models.json`.
+
+### Shared configuration
+
+| Item | Description |
+| --- | --- |
+| Config file | `config/models.json` — single source of truth for all languages |
+| Override path | Set `STAROPS_MODELS_CONFIG` environment variable to use a custom path |
+
+### CLI flags
+
+| Flag | Description |
+| --- | --- |
+| `--model provider:modelId` | Specify a model when creating a session (e.g. `--model qwen:qwen3.8-max`) |
+| `--list-models` | List all available model values and exit (no credentials required) |
+
+### Interactive command
+
+Type `/model` during a conversation to switch models interactively.
+The client displays a menu, you select a number, and it calls `UpdateThread` to apply the change.
+
+### Language examples
+
+```bash
+# Go
+cd golang && go run ./cmd/chat/ --model qwen:qwen3.8-max
+
+# Python
+cd python && python -m starops_sdk_samples.examples.chat --model qwen:qwen3.8-max
+
+# TypeScript
+cd typescript && npm run chat -- --model qwen:qwen3.8-max
+
+# Java / Java 8
+cd java && mvn exec:java \
+  -Dexec.mainClass="com.alibaba.cloud.starops.samples.examples.Chat" \
+  -Dexec.args="--model qwen:qwen3.8-max"
+```
+
+### Priority
+
+Model selection priority (highest to lowest):
+
+1. `CreateChat` request `variables.config.model`
+2. Thread `attributes.model` (set via `UpdateThread` / `/model` command)
+3. Agent default configuration
+
+### File-based chat with model
+
+See [`sample-requests/data_agent_with_model.json`](sample-requests/data_agent_with_model.json) for passing model configuration in a file request via `variables.config`.
 
 ## Retry and reconnection model
 

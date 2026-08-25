@@ -11,6 +11,20 @@ from .simple_printer import SimplePrinter
 from .event_printer import EventPrinter
 from .interactive_handler import InteractiveHandler, InteractiveResponse, ChatClientProtocol
 from .retry import RetryConfig, RetryState, ConnectionOutcome
+from .models import (
+    ModelsConfig,
+    Model,
+    Provider,
+    load_models,
+    find_config_path,
+    parse_model_flag,
+    validate_model,
+    build_model_json,
+    build_config_with_model,
+    display_menu,
+    list_model_flags,
+    get_model_by_index,
+)
 
 __all__ = [
     "Config",
@@ -28,4 +42,16 @@ __all__ = [
     "RetryConfig",
     "RetryState",
     "ConnectionOutcome",
+    "ModelsConfig",
+    "Model",
+    "Provider",
+    "load_models",
+    "find_config_path",
+    "parse_model_flag",
+    "validate_model",
+    "build_model_json",
+    "build_config_with_model",
+    "display_menu",
+    "list_model_flags",
+    "get_model_by_index",
 ]

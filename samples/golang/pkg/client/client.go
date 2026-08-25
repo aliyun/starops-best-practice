@@ -73,3 +73,20 @@ func (c *AgentClient) CreateThread(ctx context.Context, attributes ...map[string
 	}
 	return dara.StringValue(resp.Body.ThreadId), nil
 }
+
+// UpdateThread 更新会话属性（如模型配置）
+func (c *AgentClient) UpdateThread(ctx context.Context, threadID string, attributes map[string]string) error {
+	req := &starops.UpdateThreadRequest{}
+	if len(attributes) > 0 {
+		attrs := make(map[string]*string)
+		for k, v := range attributes {
+			attrs[k] = dara.String(v)
+		}
+		req.SetAttributes(attrs)
+	}
+	_, err := c.client.UpdateThread(dara.String(c.config.EmployeeName), dara.String(threadID), req)
+	if err != nil {
+		return fmt.Errorf("更新会话失败: %w", err)
+	}
+	return nil
+}

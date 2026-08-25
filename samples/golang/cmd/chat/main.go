@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/aliyun/starops-best-practice/samples/golang/pkg/client"
 	"github.com/aliyun/starops-best-practice/samples/golang/pkg/config"
 	"github.com/aliyun/starops-best-practice/samples/golang/pkg/interactive"
+	"github.com/aliyun/starops-best-practice/samples/golang/pkg/models"
 	"github.com/aliyun/starops-best-practice/samples/golang/pkg/printer"
 	"github.com/aliyun/starops-best-practice/samples/golang/pkg/types"
 	"github.com/spf13/cobra"
@@ -26,6 +28,8 @@ import (
 // chatOptions 保存 chat 命令的参数
 type chatOptions struct {
 	simulateError bool
+	model         string
+	listModels    bool
 }
 
 func main() {
@@ -46,6 +50,8 @@ func main() {
 	}
 
 	rootCmd.Flags().BoolVar(&opts.simulateError, "simulate-error", false, "模拟网络断连，测试重试逻辑")
+	rootCmd.Flags().StringVar(&opts.model, "model", "", "指定模型 (格式: provider:modelId)")
+	rootCmd.Flags().BoolVar(&opts.listModels, "list-models", false, "列出所有可传入 --model 的模型取值后退出")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "❌ %v\n", err)
@@ -57,7 +63,18 @@ func runChat(opts *chatOptions) error {
 	fmt.Println("🚀 STAROps Chat")
 	fmt.Println(strings.Repeat("=", 60))
 
-	// 加载配置
+	// 加载模型配置（不依赖凭据）
+	modelsCfg, _ := models.LoadModels(models.FindConfigPath())
+	if opts.listModels {
+		if modelsCfg == nil {
+			fmt.Println("⚠️  模型配置未加载")
+			return nil
+		}
+		fmt.Println(models.ListModelFlags(modelsCfg))
+		return nil
+	}
+
+	// 加载凭据配置
 	cfg, err := config.LoadConfigFromEnv()
 	if err != nil {
 		fmt.Println("\n请设置环境变量:")
@@ -83,7 +100,19 @@ func runChat(opts *chatOptions) error {
 
 	// 创建会话
 	fmt.Println("📝 创建会话...")
-	threadID, err := agentClient.CreateThread(ctx)
+	var threadAttrs map[string]string
+	if opts.model != "" {
+		provider, modelID, err := models.ParseModelFlag(opts.model)
+		if err != nil {
+			return fmt.Errorf("解析 --model 失败: %w", err)
+		}
+		if modelsCfg != nil && !models.ValidateModel(modelsCfg, provider, modelID) {
+			return fmt.Errorf("未知模型: %s:%s，可用 --list-models 查看可选值", provider, modelID)
+		}
+		threadAttrs = map[string]string{"model": models.BuildModelJSON(provider, modelID)}
+		fmt.Printf("🤖 已指定模型: %s:%s\n", provider, modelID)
+	}
+	threadID, err := agentClient.CreateThread(ctx, threadAttrs)
 	if err != nil {
 		return fmt.Errorf("创建会话失败: %w", err)
 	}
@@ -129,25 +158,45 @@ func runChat(opts *chatOptions) error {
 		}
 
 		input = strings.TrimSpace(input)
-		if input == "" {
+		switch input {
+		case "":
 			continue
-		}
-		if input == "quit" || input == "exit" {
+		case "quit", "exit":
 			fmt.Println("👋 再见!")
-			break
+			return nil
+		case "/model":
+			if modelsCfg == nil {
+				fmt.Println("⚠️  模型配置未加载")
+				continue
+			}
+			fmt.Println(models.DisplayMenu(modelsCfg))
+			fmt.Print("请输入序号选择模型: ")
+			choice, _ := reader.ReadString('\n')
+			idx, err := strconv.Atoi(strings.TrimSpace(choice))
+			if err != nil {
+				fmt.Println("❌ 无效输入")
+				continue
+			}
+			provider, modelID, err := models.GetModelByIndex(modelsCfg, idx-1)
+			if err != nil {
+				fmt.Println("❌", err)
+				continue
+			}
+			if err := agentClient.UpdateThread(ctx, threadID, map[string]string{"model": models.BuildModelJSON(provider, modelID)}); err != nil {
+				fmt.Printf("❌ 更新失败: %v\n", err)
+				continue
+			}
+			fmt.Println("✅ 更新模型成功")
+			continue
+		default:
+			fmt.Println(strings.Repeat("-", 60))
+			simplePrinter.Reset()
+			events := agentClient.Chat(ctx, threadID, input)
+			processChatEvents(events, simplePrinter, interactiveHandler, ctx, threadID)
+			fmt.Println()
+			fmt.Println(strings.Repeat("=", 60))
+			fmt.Println()
 		}
-
-		fmt.Println(strings.Repeat("-", 60))
-
-		// 发送消息
-		simplePrinter.Reset()
-		events := agentClient.Chat(ctx, threadID, input)
-
-		processChatEvents(events, simplePrinter, interactiveHandler, ctx, threadID)
-
-		fmt.Println()
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Println()
 	}
 
 	return nil

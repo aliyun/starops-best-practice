@@ -6,6 +6,7 @@ Interactive chat example
 Usage: python -m starops_sdk_samples.examples.chat
 """
 
+import argparse
 import asyncio
 import json
 import os
@@ -13,14 +14,57 @@ import signal
 import sys
 from typing import Optional
 
-from ..client import AgentClient, Config, SDKException, SimplePrinter, InteractiveHandler, InteractiveResponse
+from ..client import (
+    AgentClient,
+    Config,
+    SDKException,
+    ErrorCode,
+    SimplePrinter,
+    InteractiveHandler,
+    InteractiveResponse,
+)
+from ..client import (
+    ModelsConfig,
+    load_models,
+    find_config_path,
+    parse_model_flag,
+    validate_model,
+    build_model_json,
+    display_menu,
+    list_model_flags,
+    get_model_by_index,
+)
 
 
-async def main_async():
+def _parse_args() -> argparse.Namespace:
+    """解析命令行参数 / Parse CLI arguments"""
+    parser = argparse.ArgumentParser(
+        prog="chat",
+        description="STAROps 交互式对话示例",
+    )
+    parser.add_argument(
+        "--simulate-error",
+        action="store_true",
+        help="模拟网络断连，测试重试逻辑",
+    )
+    parser.add_argument(
+        "--model",
+        default="",
+        help="指定模型 (格式: provider:modelId)",
+    )
+    parser.add_argument(
+        "--list-models",
+        action="store_true",
+        help="列出所有可传入 --model 的模型取值后退出",
+    )
+    return parser.parse_args()
+
+
+async def main_async(args: argparse.Namespace, models_cfg: Optional[ModelsConfig]):
     print("🚀 STAROps Chat (Python)")
     print("=" * 60)
 
-    simulate_error = "-simulate-error" in sys.argv
+    simulate_error = args.simulate_error
 
     try:
         # Load configuration
@@ -36,7 +80,19 @@ async def main_async():
 
         # Create thread
         print("📝 创建会话...")
-        thread_id = client.create_thread()
+        thread_attrs: Optional[dict] = None
+        if args.model:
+            provider, model_id = parse_model_flag(args.model)
+            if models_cfg is not None and not validate_model(
+                models_cfg, provider, model_id
+            ):
+                raise SDKException(
+                    ErrorCode.CONFIG_INVALID,
+                    f"未知模型: {provider}:{model_id}，可用 --list-models 查看可选值",
+                )
+            thread_attrs = {"model": build_model_json(provider, model_id)}
+            print(f"🤖 已指定模型: {provider}:{model_id}")
+        thread_id = client.create_thread(thread_attrs)
         print(f"✅ ThreadID: {thread_id}\n")
 
         # 捕获中断信号，发送 stop 请求
@@ -70,6 +126,35 @@ async def main_async():
             if user_input in ("quit", "exit"):
                 print("👋 再见!")
                 break
+            if user_input == "/model":
+                if models_cfg is None:
+                    print("⚠️  模型配置未加载")
+                    continue
+                print(display_menu(models_cfg))
+                try:
+                    choice = input("请输入序号选择模型: ")
+                except EOFError:
+                    print("\n👋 再见!")
+                    break
+                try:
+                    idx = int(choice.strip())
+                except ValueError:
+                    print("❌ 无效输入")
+                    continue
+                try:
+                    provider, model_id = get_model_by_index(models_cfg, idx - 1)
+                except ValueError as e:
+                    print("❌", e)
+                    continue
+                try:
+                    client.update_thread(
+                        thread_id, {"model": build_model_json(provider, model_id)}
+                    )
+                except Exception as e:
+                    print(f"❌ 更新失败: {e}")
+                    continue
+                print("✅ 更新模型成功")
+                continue
 
             print("-" * 60)
 
@@ -130,7 +215,24 @@ def _extract_interactive_event(event, handler: InteractiveHandler) -> Optional[I
 
 
 def main():
-    asyncio.run(main_async())
+    args = _parse_args()
+
+    # 加载模型配置（不依赖凭据）
+    models_cfg: Optional[ModelsConfig] = None
+    try:
+        models_cfg = load_models(find_config_path())
+    except Exception:
+        models_cfg = None
+
+    # --list-models 在加载凭据之前短路，不需要凭据
+    if args.list_models:
+        if models_cfg is None:
+            print("⚠️  模型配置未加载")
+            return
+        print(list_model_flags(models_cfg))
+        return
+
+    asyncio.run(main_async(args, models_cfg))
 
 
 if __name__ == "__main__":

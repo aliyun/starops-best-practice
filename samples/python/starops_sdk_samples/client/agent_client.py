@@ -51,8 +51,11 @@ class AgentClient:
         except Exception as e:
             raise SDKException.client_create(e)
 
-    def create_thread(self) -> str:
-        """创建会话 / Create thread"""
+    def create_thread(self, attributes: Optional[Dict[str, str]] = None) -> str:
+        """创建会话 / Create thread
+
+        attributes: 可选的会话属性（如 {"model": '{"provider":..,"modelID":..}'}）。
+        """
         if self.config.mock_mode:
             return "mock-thread-001"
         try:
@@ -63,6 +66,8 @@ class AgentClient:
                 title=f"Chat-{int(time.time())}",
                 variables=variables,
             )
+            if attributes:
+                request.attributes = dict(attributes)
             response = self._client.create_thread(self.config.employee_name, request)
 
             if not response.body or not response.body.thread_id:
@@ -73,6 +78,26 @@ class AgentClient:
             raise
         except Exception as e:
             raise SDKException.thread_create(e)
+
+    def update_thread(self, thread_id: str, attributes: Dict[str, str]) -> None:
+        """更新会话属性（如模型配置）/ Update thread attributes (e.g. model config)
+
+        参考 Go 的 UpdateThread：以 employee_name + thread_id 定位会话，
+        通过 UpdateThreadRequest.attributes 提交属性 map。
+        """
+        if self.config.mock_mode:
+            return
+        try:
+            request = starops_models.UpdateThreadRequest()
+            if attributes:
+                request.attributes = dict(attributes)
+            self._client.update_thread(
+                self.config.employee_name, thread_id, request
+            )
+        except Exception as e:
+            raise SDKException(
+                ErrorCode.API_ERROR, f"更新会话失败: {thread_id}", e
+            ).with_context("threadId", thread_id)
 
     def stop(self, thread_id: str, variables: Optional[Dict[str, Any]] = None) -> None:
         """发送停止请求，中断正在进行的对话（同步调用，带超时）/ Send stop request"""
