@@ -18,7 +18,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.0</junit.version>
         <mockito.version>4.11.0</mockito.version>
-        <jackson.version>2.15.2</jackson.version>
+        <jackson.version>2.18.10</jackson.version>
     </properties>
 
     <dependencies>
